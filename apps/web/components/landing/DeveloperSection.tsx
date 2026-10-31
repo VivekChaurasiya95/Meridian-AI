@@ -25,13 +25,13 @@ export function DeveloperSection() {
           <div className="relative grid gap-10 p-8 sm:p-12 md:grid-cols-[0.9fr_1.1fr] md:items-center">
             {/* Portrait with floating chips */}
             <div className="relative mx-auto w-fit">
-              <div aria-hidden="true" className="absolute -inset-3 rounded-[28px] bg-accent/15 blur-2xl" />
+              <div aria-hidden="true" className="absolute -inset-3 rounded-[28px] bg-sage/15 blur-2xl" />
               <DeveloperPhoto className="relative size-56 rounded-3xl border border-line shadow-pop sm:size-64" />
               {!reduceMotion && (
                 <>
                   <motion.span
                     aria-hidden="true"
-                    className="absolute -top-4 -right-6 rounded-full border border-line bg-canvas px-3.5 py-1.5 font-mono text-[11px] font-medium text-accent shadow-pop"
+                    className="absolute -top-4 -right-6 rounded-full border border-line bg-canvas px-3.5 py-1.5 font-mono text-[11px] font-medium text-sage shadow-pop"
                     animate={{ y: [0, -8, 0] }}
                     transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
                   >
@@ -50,14 +50,14 @@ export function DeveloperSection() {
             </div>
 
             <div>
-              <p className="flex items-center gap-3 font-mono text-xs font-medium text-accent">
-                <span aria-hidden="true" className="h-px w-8 bg-accent" />
+              <p className="flex items-center gap-3 font-mono text-xs font-medium text-sage">
+                <span aria-hidden="true" className="h-px w-8 bg-sage" />
                 Meet the developer
               </p>
               <h2 className="font-display mt-5 text-3xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-4xl">
                 <StaggerHeadline text={DEVELOPER.name} />
               </h2>
-              <p className="mt-2 font-medium text-accent">{DEVELOPER.role}</p>
+              <p className="mt-2 font-medium text-sage">{DEVELOPER.role}</p>
               <p className="mt-4 max-w-xl leading-7 text-ink-2">
                 {DEVELOPER.tagline} Meridian is designed, built, and maintained
                 end to end — interface, API, data model, and infrastructure.
@@ -78,7 +78,7 @@ export function DeveloperSection() {
               </div>
               <Link
                 href="/developer"
-                className="group mt-7 inline-flex items-center gap-1.5 text-[15px] font-semibold text-accent transition-colors hover:text-accent-hover"
+                className="group mt-7 inline-flex items-center gap-1.5 text-[15px] font-semibold text-sage transition-colors hover:opacity-75"
               >
                 Full developer story
                 <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />

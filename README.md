@@ -10,7 +10,7 @@
 [![Python](https://img.shields.io/badge/python-%3E%3D3.12-3776AB?logo=python&logoColor=white)](services/api/pyproject.toml)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/VivekChaurasiya95/Meridian-AI/pulls)
 
-<img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=500&size=21&duration=2800&pause=1200&color=E8833A&center=true&vCenter=true&width=620&lines=Clarity+for+complex+engineering;Bug+reports+in.+Evidence+out.;Reproduce.+Capture.+Verify." alt="Typing animation: Clarity for complex engineering" />
+<img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=500&size=21&duration=2800&pause=1200&color=6B7A56&center=true&vCenter=true&width=620&lines=Clarity+for+complex+engineering;Bug+reports+in.+Evidence+out.;Reproduce.+Capture.+Verify." alt="Typing animation: Clarity for complex engineering" />
 
 **An AI-assisted debugging and reliability platform.** Meridian turns a developer's
 bug report into a structured, evidence-backed investigation — reproduce, capture
@@ -58,6 +58,7 @@ Spec authority: `SECURITY.md` > PRD > `ARCHITECTURE.md`/`API.md` > `DATABASE.md`
 | 🌐 **Social login** | Google and GitHub sign-in via Firebase, exchanged for the same session cookie |
 | 🏢 **Workspaces** | Create/rename workspaces, cursor pagination, role-based membership (owner/admin/developer/viewer) |
 | 🎥 **Product tour** | Animated explainer of the investigation loop, or attach your own demo video |
+| 🔬 **Playground** | Interactive desktop scene: feed a file, pick a workflow, watch the agents work |
 | 👨‍💻 **Developer page** | Meet-the-developer story, stack, and project highlights |
 | ❤️ **Health checks** | Liveness (no DB) and readiness (DB + dependency checks) endpoints |
 
@@ -290,7 +291,7 @@ MIT — see [LICENSE](LICENSE).
 
 [![GitHub](https://img.shields.io/badge/GitHub-VivekChaurasiya95-181717?logo=github&logoColor=white)](https://github.com/VivekChaurasiya95)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/vivek-chaurasiya-722037315)
-[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-E8833A?logo=vercel&logoColor=white)](https://vivek-chaurasiya.vercel.app)
+[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-23201C?logo=vercel&logoColor=white)](https://vivek-chaurasiya.vercel.app)
 
 *Designed & built end to end — interface, API, data model, and infrastructure.*
 

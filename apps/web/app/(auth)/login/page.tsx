@@ -90,7 +90,7 @@ export default function LoginPage() {
       subtitle={
         <>
           New here?{" "}
-          <Link href="/signup" className="font-medium text-accent hover:text-accent-hover">
+          <Link href="/signup" className="font-medium text-sage hover:opacity-75">
             Create an account
           </Link>
         </>

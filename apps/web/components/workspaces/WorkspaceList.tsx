@@ -20,7 +20,7 @@ export function WorkspaceList({ items }: { items: Workspace[] }) {
               <CardContent className="flex items-center gap-4">
                 <span
                   aria-hidden="true"
-                  className="font-display flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-subtle text-[17px] font-semibold text-accent"
+                  className="font-display flex size-10 shrink-0 items-center justify-center rounded-xl bg-sage-subtle text-[17px] font-semibold text-sage"
                 >
                   {workspace.name.trim().charAt(0).toUpperCase() || "?"}
                 </span>

@@ -3,36 +3,42 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Meridian design tokens — "Ember & Oak".
- * Light mode is a warm paper studio; `.dark` is a rich roasted espresso.
+ * Meridian design tokens — "Sage & Bone".
+ * Ink actions on a sage-tinted bone studio, pale actions on a green-ink
+ * night, with a sage-green voice for eyebrows, headlines, links, badges,
+ * and progress. Lifted cards, present hairlines, clean grey-green text;
+ * semantic hues (success/warning/danger/info) stay chromatic so meaning
+ * never depends on shade alone.
  * Unlayered author styles win over layered @theme output, so the dark block
  * below reliably replaces every token when next-themes sets the class.
  */
 @theme {
-  /* Warm paper — light */
-  --color-canvas: #f4eee2;
-  --color-surface-1: #fdfaf3;
-  --color-surface-2: #ece4d2;
-  --color-surface-3: #ddd1b8;
-  --color-inset: #f8f3e7;
-  --color-line: #ddd0b8;
-  --color-line-strong: #c2b294;
-  --color-ink: #221a12;
-  --color-ink-2: #5d5145;
-  --color-ink-3: #8b7f6c;
-  --color-accent: #b4431a;
-  --color-accent-hover: #96340f;
-  --color-accent-pressed: #7c2b0e;
-  --color-accent-subtle: #f3dcc4;
-  --color-accent-ink: #fff8ef;
-  --color-ember: #d9702b;
-  --color-moss: #2e6b4f;
-  --color-teal: #13665c;
+  /* Sage-tinted bone — light */
+  --color-canvas: #eff0e6;
+  --color-surface-1: #fafbf6;
+  --color-surface-2: #e6e8da;
+  --color-surface-3: #d6d9c6;
+  --color-inset: #f4f5ec;
+  --color-line: #d3d6c4;
+  --color-line-strong: #b3b8a3;
+  --color-ink: #1e2119;
+  --color-ink-2: #55594b;
+  --color-ink-3: #878b78;
+  --color-accent: #1e2119;
+  --color-accent-hover: #353a2e;
+  --color-accent-pressed: #10130d;
+  --color-accent-subtle: #e4e7db;
+  --color-accent-ink: #f8faf5;
+  --color-ember: #8b9182;
+  --color-moss: #4a7c43;
+  --color-teal: #0e7a6c;
   --color-success: #2c7a4d;
   --color-warning: #96690f;
-  --color-danger: #b3372f;
+  --color-danger: #c23b2e;
   --color-info: #325fc4;
-  --color-neutral: #6d6355;
+  --color-neutral: #6b705f;
+  --color-sage: #57663f;
+  --color-sage-subtle: #e8eee1;
 
   --font-sans: "DM Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
@@ -46,7 +52,7 @@
 
   --shadow-card: 0 1px 2px rgb(64 45 20 / 0.08), 0 8px 24px -12px rgb(64 45 20 / 0.25);
   --shadow-pop: 0 2px 6px rgb(64 45 20 / 0.1), 0 24px 48px -16px rgb(64 45 20 / 0.3);
-  --shadow-glow: 0 0 0 1px rgb(212 112 43 / 0.25), 0 12px 32px -8px rgb(180 67 26 / 0.45);
+  --shadow-glow: 0 0 0 1px rgb(34 26 18 / 0.2), 0 12px 32px -8px rgb(34 26 18 / 0.35);
 
   --animate-marquee: marquee 36s linear infinite;
   --animate-ticker: ticker 9s ease-in-out infinite;
@@ -55,6 +61,7 @@
   --animate-spin-slow: spin 14s linear infinite;
   --animate-dropdown-in: dropdown-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-rise-in: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-blink-eyes: blink-eyes 4.2s ease-in-out infinite;
 
   @keyframes marquee {
     from { transform: translateX(0); }
@@ -74,6 +81,10 @@
     from { background-position: 200% 0; }
     to { background-position: -200% 0; }
   }
+  @keyframes blink-eyes {
+    0%, 92%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.08); }
+  }
   @keyframes dropdown-in {
     from { opacity: 0; transform: scale(0.96) translateY(-4px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
@@ -85,34 +96,36 @@
 }
 
 .dark {
-  /* Roasted espresso — dark */
-  --color-canvas: #12100b;
-  --color-surface-1: #1b1712;
-  --color-surface-2: #241f17;
-  --color-surface-3: #2f2820;
-  --color-inset: #16120d;
-  --color-line: #332b21;
-  --color-line-strong: #4c4133;
-  --color-ink: #f3ebdb;
-  --color-ink-2: #bfb29c;
-  --color-ink-3: #8c806d;
-  --color-accent: #e89c52;
-  --color-accent-hover: #f2ae6b;
-  --color-accent-pressed: #d98336;
-  --color-accent-subtle: #31230f;
-  --color-accent-ink: #1f1305;
-  --color-ember: #e8763a;
-  --color-moss: #5cb98d;
-  --color-teal: #5fbfb0;
-  --color-success: #5cc993;
-  --color-warning: #e5b45c;
-  --color-danger: #e87a70;
-  --color-info: #84aef0;
-  --color-neutral: #a2977f;
+  /* Ink night — dark */
+  --color-canvas: #0e100c;
+  --color-surface-1: #171a14;
+  --color-surface-2: #1f241c;
+  --color-surface-3: #2a3026;
+  --color-inset: #11140f;
+  --color-line: #2e352a;
+  --color-line-strong: #47503f;
+  --color-ink: #eef2e6;
+  --color-ink-2: #bcc3ae;
+  --color-ink-3: #8b937f;
+  --color-accent: #eef2e6;
+  --color-accent-hover: #fbfdf7;
+  --color-accent-pressed: #cfd6c2;
+  --color-accent-subtle: #20261c;
+  --color-accent-ink: #12140f;
+  --color-ember: #949b86;
+  --color-moss: #6fce97;
+  --color-teal: #5ee0c0;
+  --color-success: #4fd08c;
+  --color-warning: #e8b45a;
+  --color-danger: #f26d5f;
+  --color-info: #7fb0f5;
+  --color-neutral: #9aa18c;
+  --color-sage: #a9bd93;
+  --color-sage-subtle: #1e2618;
 
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 32px -16px rgb(0 0 0 / 0.55);
-  --shadow-pop: 0 4px 12px rgb(0 0 0 / 0.5), 0 32px 64px -20px rgb(0 0 0 / 0.65);
-  --shadow-glow: 0 0 0 1px rgb(232 156 82 / 0.3), 0 16px 40px -10px rgb(232 156 82 / 0.35);
+  --shadow-card: inset 0 1px 0 rgb(235 242 230 / 0.05), 0 1px 2px rgb(0 0 0 / 0.45), 0 16px 32px -16px rgb(0 0 0 / 0.6);
+  --shadow-pop: inset 0 1px 0 rgb(235 242 230 / 0.06), 0 4px 12px rgb(0 0 0 / 0.5), 0 32px 64px -20px rgb(0 0 0 / 0.65);
+  --shadow-glow: 0 0 0 1px rgb(245 237 222 / 0.16), 0 16px 40px -10px rgb(245 237 222 / 0.22);
 }
 
 @layer base {

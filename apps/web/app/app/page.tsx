@@ -73,7 +73,7 @@ export default function OverviewPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-accent uppercase">
+          <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-sage uppercase">
             Workspace
           </p>
           <h1 className="font-display mt-1.5 text-[32px] leading-9 font-semibold tracking-tight">Overview</h1>
@@ -123,7 +123,7 @@ export default function OverviewPage() {
               <Card>
                 <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl border border-line bg-surface-2">
-                    <FolderOpen aria-hidden="true" className="size-5 text-accent" />
+                    <FolderOpen aria-hidden="true" className="size-5 text-sage" />
                   </span>
                   <div>
                     <p className="font-medium">No workspaces yet</p>

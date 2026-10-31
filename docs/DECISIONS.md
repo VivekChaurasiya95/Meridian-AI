@@ -141,6 +141,60 @@ contracts > Database spec > Design system > Implementation plan > existing code.
   email matching an existing account signs into that account instead of
   duplicating it. Unverified or missing emails are rejected. Password auth
   is unchanged.
+- **D27 — Dark palette rebuilt ("Ember night"), primary untouched (user-owned).**
+  The accent ramp is byte-identical in both modes. Dark supporting colors were
+  redone for depth and legibility: deeper canvas, lifted card surfaces, more
+  present hairlines, cleaner neutral-warm text ramp, richer status hues, and a
+  faint top-light in card shadows. Light mode keeps its palette with only
+  micro-shifts to surface/line separation.
+- **D28 — Rebrand to "Meridian Deep" (user-owned).** The rust-orange primary
+  felt heavy on paper, so the accent ramp is now deep lagoon teal (light
+  `#0e6f5c`, dark `#4fd6b5`) with warm brass as the rare metallic secondary
+  (`ember` token). Surfaces, lines, text, and status hues from D27 are kept;
+  glow shadows follow the new accent. All component colors flow through
+  tokens, so the swap is token-only; no component markup changed.
+- **D29 — Rebrand to "Meridian Noir" (user-owned, supersedes D28).** Teal was
+  rejected in the UI, so the accent ramp is now oxblood editorial (light
+  `#8a1f2d`, dark `#e8737a`) with warm brass kept as the rare metallic
+  secondary. Danger hues were pushed brighter/warmer so errors never read as
+  brand wine. Surfaces, lines, text, and remaining status hues are unchanged;
+  token-only swap, no markup changes.
+- **D30 — Rebrand to "Meridian Ink" (user-owned, supersedes D29).** Oxblood was
+  rejected in the UI, so the identity is now monochrome: ink-black actions on
+  paper (light `#221a12`), warm-white actions on charcoal (dark `#f5edde`).
+  Semantic hues (success/warning/danger/info/teal) deliberately stay chromatic
+  so errors and statuses keep their meaning. Token-only swap; README accents
+  follow the new ink.
+- **D31 — "Sage & Bone" voice (user-owned, reference-driven).** Actions stay
+  monochrome ink, but eyebrows, headline accents, links, badges, progress, and
+  decorative glows now speak sage (`#57663f` light / `#a9bd93` dark, plus a
+  `sage-subtle` tint) after a sage-and-bone reference the user preferred.
+  Buttons, focus rings, selection, and controls keep the ink ramp; semantic
+  hues are untouched.
+- **D32 — Green-grey neutrals (user-owned).** Canvas, surfaces, lines, inks,
+  and the ink action ramp carry a faint sage tint in both modes
+  (light `#eff0e6` bone, dark `#0e100c` green-ink) after a pale-green
+  reference. Sage voice, semantic hues, and depth system are unchanged.
+- **D33 — Vivid green voice (user-owned).** The grey sage did not read as
+  green, so it went saturated and bright (light `#1f7a38`, dark `#7ce495`)
+  with matching tints. Contrast holds (~5:1 light, ~9:1 dark); semantic
+  hues and neutrals are unchanged.
+- **D34 — "Watch the work" demo section (user-owned, reference-driven).** The
+  landing demo is a tabbed interactive miniature (report lands, evidence
+  builds, verified fix): a mock investigation whose rows flip queued to done
+  while a dark steps panel checks off in sync, ending in a replayable loop.
+  A real video URL still overrides it; reduced-motion users see finished
+  states statically.
+- **D35 — Agent playground section (user-owned, reference-driven).** A second
+  landing moment after the demo: an interactive desktop scene with workflow
+  mode pills, a tappable file card, a blinking agent with a three-member
+  team, and a play/pause dock. Workflows animate queued to done with a
+  celebration bounce; reduced-motion users see finished states statically.
+- **D36 — Playground polish (user-owned).** Characters went light and bright
+  (pastel blobs, vivid presence dots, lime play affordances), the caption
+  moved clear of the hint line, mode pills became a segmented control, and
+  the scene is selection-proof. New character interactions: click the agent
+  for a speech bubble, hover for a wiggle, click teammates for a hop.
 
 ## Open items (carried forward)
 

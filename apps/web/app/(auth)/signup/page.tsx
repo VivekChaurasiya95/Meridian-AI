@@ -69,7 +69,7 @@ export default function SignupPage() {
       subtitle={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
+          <Link href="/login" className="font-medium text-sage hover:opacity-75">
             Sign in
           </Link>
         </>

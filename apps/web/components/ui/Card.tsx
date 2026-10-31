@@ -39,7 +39,7 @@ export function CardHeader({ className, children, ...rest }: React.HTMLAttribute
 
 export function CardEyebrow({ className, children, ...rest }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("font-mono text-[11px] font-medium tracking-[0.14em] text-accent uppercase", className)} {...rest}>
+    <p className={cn("font-mono text-[11px] font-medium tracking-[0.14em] text-sage uppercase", className)} {...rest}>
       {children}
     </p>
   );

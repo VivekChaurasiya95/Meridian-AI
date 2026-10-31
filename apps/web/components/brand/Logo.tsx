@@ -45,7 +45,7 @@ interface LockupProps {
   withSuffix?: boolean;
 }
 
-/** Full horizontal lockup: mark in an ember tile + "Meridian AI" wordmark. */
+/** Full horizontal lockup: mark in an accent tile + "Meridian AI" wordmark. */
 export function MeridianLogo({ className, markSize = 26, withSuffix = true }: LockupProps) {
   return (
     <span className={cn("group inline-flex items-center gap-2.5", className)}>

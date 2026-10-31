@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Bug, Camera, FlaskConical, GitPullRequest, SearchCheck, ShieldCheck, TerminalSquare } from "lucide-react";
 import { MeridianLogo } from "@/components/brand/Logo";
+import { AgentPlayground } from "@/components/landing/AgentPlayground";
 import { DeveloperSection } from "@/components/landing/DeveloperSection";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { VideoSpotlight } from "@/components/landing/VideoSpotlight";
@@ -50,11 +51,11 @@ export default function LandingPage() {
             <MeridianLogo markSize={26} />
           </Link>
           <nav aria-label="Landing" className="ml-10 hidden items-center gap-7 text-[13px] font-semibold text-ink-2 md:flex">
-            <a href="#workflow" className="transition-colors hover:text-accent">Workflow</a>
-            <a href="#principles" className="transition-colors hover:text-accent">Principles</a>
-            <a href="#demo" className="transition-colors hover:text-accent">Demo</a>
-            <a href="#status" className="transition-colors hover:text-accent">Status</a>
-            <Link href="/developer" className="transition-colors hover:text-accent">Developer</Link>
+            <a href="#workflow" className="transition-colors hover:text-sage">Workflow</a>
+            <a href="#principles" className="transition-colors hover:text-sage">Principles</a>
+            <a href="#demo" className="transition-colors hover:text-sage">Demo</a>
+            <a href="#status" className="transition-colors hover:text-sage">Status</a>
+            <Link href="/developer" className="transition-colors hover:text-sage">Developer</Link>
           </nav>
           <span className="ml-auto flex items-center gap-2.5">
             <ThemeToggle />
@@ -75,8 +76,8 @@ export default function LandingPage() {
           <div aria-hidden="true" className="texture-dots pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_70%_60%_at_30%_20%,black,transparent)]" />
           <div className="relative mx-auto grid w-full max-w-6xl gap-12 px-4 pt-14 pb-16 sm:px-6 md:grid-cols-[1.15fr_0.85fr] md:items-center md:pt-20 md:pb-24">
             <div>
-              <p className="flex items-center gap-3 font-mono text-xs font-medium text-accent">
-                <span aria-hidden="true" className="h-px w-8 bg-accent" />
+              <p className="flex items-center gap-3 font-mono text-xs font-medium text-sage">
+                <span aria-hidden="true" className="h-px w-8 bg-sage" />
                 Meridian AI · Debugging &amp; reliability
               </p>
               <h1 className="font-display mt-6 text-[42px] leading-[1.04] font-semibold tracking-tight text-balance sm:text-[56px]">
@@ -85,7 +86,7 @@ export default function LandingPage() {
                 <span className="text-ink-2">
                   <StaggerHeadline text="Investigation-grade" delay={0.25} />
                 </span>{" "}
-                <em className="text-accent not-italic">
+                <em className="text-sage not-italic">
                   <RotatingWord words={TICKER_WORDS} />
                 </em>
               </h1>
@@ -172,7 +173,7 @@ export default function LandingPage() {
                 {MARQUEE.map((item) => (
                   <span key={`${copy}-${item}`} className="flex items-center">
                     <span className="px-6 font-mono text-[13px] font-medium tracking-wide text-ink-2 uppercase">{item}</span>
-                    <span className="size-1.5 rounded-full bg-accent" />
+                    <span className="size-1.5 rounded-full bg-sage" />
                   </span>
                 ))}
               </div>
@@ -184,13 +185,17 @@ export default function LandingPage() {
 
         <div aria-hidden="true" className="rule-fade mx-auto max-w-6xl" />
 
+        <AgentPlayground />
+
+        <div aria-hidden="true" className="rule-fade mx-auto max-w-6xl" />
+
         {/* Workflow — sticky index + steps */}
         <section id="workflow" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 md:py-24">
           <div className="grid gap-10 md:grid-cols-[0.9fr_1.1fr] md:gap-16">
             <div className="md:sticky md:top-24 md:self-start">
               <Reveal>
-                <p className="flex items-center gap-3 font-mono text-xs font-medium text-accent">
-                  <span aria-hidden="true" className="h-px w-8 bg-accent" />
+                <p className="flex items-center gap-3 font-mono text-xs font-medium text-sage">
+                  <span aria-hidden="true" className="h-px w-8 bg-sage" />
                   The pipeline
                 </p>
                 <h2 className="font-display mt-5 text-3xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-4xl">
@@ -202,7 +207,7 @@ export default function LandingPage() {
                 </p>
                 <Link
                   href="/app"
-                  className="group mt-7 inline-flex items-center gap-1.5 text-[15px] font-semibold text-accent transition-colors hover:text-accent-hover"
+                  className="group mt-7 inline-flex items-center gap-1.5 text-[15px] font-semibold text-sage transition-colors hover:opacity-75"
                 >
                   See what works today
                   <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -213,12 +218,12 @@ export default function LandingPage() {
               {STAGES.map((stage, i) => (
                 <Reveal as="li" key={stage.n} delay={Math.min(i * 0.04, 0.2)}>
                   <div className="group flex gap-5 border-t border-line/70 py-6 transition-colors duration-200 last:border-b hover:bg-surface-1/60 sm:gap-7 sm:px-4">
-                    <span className="font-display tnum w-12 shrink-0 text-2xl font-semibold text-line-strong transition-colors duration-200 group-hover:text-accent">
+                    <span className="font-display tnum w-12 shrink-0 text-2xl font-semibold text-line-strong transition-colors duration-200 group-hover:text-sage">
                       {stage.n}
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:gap-6">
                       <span className="flex items-center gap-2.5 font-semibold text-ink sm:w-36 sm:shrink-0">
-                        <stage.icon aria-hidden="true" className="size-4 shrink-0 text-ink-3 transition-colors duration-200 group-hover:text-accent sm:hidden" />
+                        <stage.icon aria-hidden="true" className="size-4 shrink-0 text-ink-3 transition-colors duration-200 group-hover:text-sage sm:hidden" />
                         {stage.title}
                       </span>
                       <span className="text-ink-2">{stage.body}</span>
@@ -235,8 +240,8 @@ export default function LandingPage() {
         {/* Principles — editorial list */}
         <section id="principles" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6 md:py-24">
           <Reveal className="max-w-2xl">
-            <p className="flex items-center gap-3 font-mono text-xs font-medium text-accent">
-              <span aria-hidden="true" className="h-px w-8 bg-accent" />
+            <p className="flex items-center gap-3 font-mono text-xs font-medium text-sage">
+              <span aria-hidden="true" className="h-px w-8 bg-sage" />
               Operating principles
             </p>
             <h2 className="font-display mt-5 text-3xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-4xl">
@@ -247,7 +252,7 @@ export default function LandingPage() {
             {PRINCIPLES.map((principle, i) => (
               <Reveal key={principle.title} delay={(i % 2) * 0.08}>
                 <div className="border-t border-line/70 py-7">
-                  <p className="font-display text-lg text-accent italic">({principle.n})</p>
+                  <p className="font-display text-lg text-sage italic">({principle.n})</p>
                   <h3 className="font-display mt-2 text-[22px] font-semibold tracking-tight">{principle.title}</h3>
                   <p className="mt-2 max-w-md leading-6 text-ink-2">{principle.body}</p>
                 </div>
@@ -259,11 +264,11 @@ export default function LandingPage() {
         {/* Build status — warm panel */}
         <section id="status" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-16 sm:px-6 md:pb-24">
           <Reveal>
-            <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-surface-1 shadow-pop">
-              <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-accent" />
+            <div className="relative overflow-hidden rounded-2xl border border-sage/25 bg-surface-1 shadow-pop">
+              <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-sage" />
               <div className="grid gap-10 p-8 sm:p-12 md:grid-cols-[1.2fr_0.8fr] md:items-center">
                 <div>
-                  <p className="font-mono text-xs font-medium tracking-[0.14em] text-accent uppercase">
+                  <p className="font-mono text-xs font-medium tracking-[0.14em] text-sage uppercase">
                     Build status · Milestones 1–2 live
                   </p>
                   <h2 className="font-display mt-4 text-3xl leading-[1.1] font-semibold tracking-tight text-balance">
@@ -306,7 +311,7 @@ export default function LandingPage() {
                             state === "done"
                               ? "size-2 rounded-full bg-success"
                               : state === "next"
-                                ? "size-2 animate-pulse-dot rounded-full bg-accent"
+                                ? "size-2 animate-pulse-dot rounded-full bg-sage"
                                 : "size-2 rounded-full bg-surface-3"
                           }
                         />
@@ -318,7 +323,7 @@ export default function LandingPage() {
                     ))}
                   </ol>
                   <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-surface-3">
-                    <div className="h-full w-[22%] rounded-full bg-accent" />
+                    <div className="h-full w-[22%] rounded-full bg-sage" />
                   </div>
                 </div>
               </div>

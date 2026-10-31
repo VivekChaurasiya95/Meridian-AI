@@ -8,7 +8,7 @@ const badgeVariants = cva(
     variants: {
       tone: {
         neutral: "border-line bg-surface-2 text-ink-2",
-        accent: "border-accent/30 bg-accent-subtle text-accent",
+        accent: "border-sage/30 bg-sage-subtle text-sage",
         success: "border-success/30 bg-success/12 text-success",
         warning: "border-warning/30 bg-warning/12 text-warning",
         danger: "border-danger/30 bg-danger/12 text-danger",
@@ -21,7 +21,7 @@ const badgeVariants = cva(
 
 const dotClass: Record<string, string> = {
   neutral: "bg-neutral",
-  accent: "bg-accent",
+  accent: "bg-sage",
   success: "bg-success",
   warning: "bg-warning",
   danger: "bg-danger",

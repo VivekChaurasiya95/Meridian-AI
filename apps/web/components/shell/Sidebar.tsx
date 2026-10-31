@@ -68,7 +68,7 @@ export function Sidebar() {
       })}
       <div className="mt-auto px-1 pt-4">
         <div className="rounded-xl border border-line/70 bg-surface-1 p-3.5 shadow-card">
-          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-accent uppercase">Milestone 2</p>
+          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-sage uppercase">Milestone 2</p>
           <p className="mt-1 text-xs leading-5 text-ink-2">
             Auth & workspaces live. Unbuilt areas are marked, never faked.
           </p>

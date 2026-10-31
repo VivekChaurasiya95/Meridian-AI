@@ -50,7 +50,7 @@ export default function DeveloperPage() {
           <div aria-hidden="true" className="texture-dots pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_60%_60%_at_70%_20%,black,transparent)]" />
           <div className="relative grid gap-12 md:grid-cols-[0.85fr_1.15fr] md:items-center">
             <Reveal className="relative mx-auto w-fit">
-              <div aria-hidden="true" className="absolute -inset-4 rounded-[32px] bg-accent/15 blur-2xl" />
+              <div aria-hidden="true" className="absolute -inset-4 rounded-[32px] bg-sage/15 blur-2xl" />
               <DeveloperPhoto className="font-display relative size-64 text-7xl sm:size-72" />
               <span className="absolute -bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-canvas px-4 py-2 shadow-pop">
                 <span aria-hidden="true" className="size-2 animate-pulse-dot rounded-full bg-success" />
@@ -58,14 +58,14 @@ export default function DeveloperPage() {
               </span>
             </Reveal>
             <div>
-              <p className="flex items-center gap-3 font-mono text-xs font-medium text-accent">
-                <span aria-hidden="true" className="h-px w-8 bg-accent" />
+              <p className="flex items-center gap-3 font-mono text-xs font-medium text-sage">
+                <span aria-hidden="true" className="h-px w-8 bg-sage" />
                 Developer · Meridian AI
               </p>
               <h1 className="font-display mt-6 text-[42px] leading-[1.04] font-semibold tracking-tight text-balance sm:text-[56px]">
                 <StaggerHeadline text={DEVELOPER.name} />
               </h1>
-              <p className="mt-3 text-lg font-medium text-accent">
+              <p className="mt-3 text-lg font-medium text-sage">
                 Building with <RotatingWord words={FOCUS} />
               </p>
               <p className="mt-5 max-w-xl text-[15px] leading-7 text-ink-2">{DEVELOPER.bio}</p>
@@ -93,7 +93,7 @@ export default function DeveloperPage() {
         {/* Stack */}
         <section className="py-14 md:py-16">
           <Reveal className="max-w-2xl">
-            <p className="flex items-center gap-2.5 font-mono text-xs font-medium text-accent">
+            <p className="flex items-center gap-2.5 font-mono text-xs font-medium text-sage">
               <Code2 aria-hidden="true" className="size-3.5" />
               Toolbox
             </p>
@@ -115,7 +115,7 @@ export default function DeveloperPage() {
         {/* Highlights */}
         <section className="py-14 md:py-16">
           <Reveal className="max-w-2xl">
-            <p className="flex items-center gap-2.5 font-mono text-xs font-medium text-accent">
+            <p className="flex items-center gap-2.5 font-mono text-xs font-medium text-sage">
               <Briefcase aria-hidden="true" className="size-3.5" />
               Built in this project
             </p>
@@ -125,7 +125,7 @@ export default function DeveloperPage() {
             {DEVELOPER.highlights.map((item, i) => (
               <Reveal key={item.title} delay={i * 0.08}>
                 <article className="group h-full rounded-2xl border border-line bg-surface-1 p-6 shadow-card transition-all duration-200 hover:border-line-strong hover:shadow-pop">
-                  <span className="font-display text-2xl font-semibold text-line-strong transition-colors duration-200 group-hover:text-accent">
+                  <span className="font-display text-2xl font-semibold text-line-strong transition-colors duration-200 group-hover:text-sage">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <h3 className="font-display mt-3 text-lg font-semibold">{item.title}</h3>
@@ -139,9 +139,9 @@ export default function DeveloperPage() {
         {/* CTA */}
         <section className="pb-16 md:pb-24">
           <Reveal>
-            <div className="relative overflow-hidden rounded-2xl border border-accent/25 bg-surface-1 px-8 py-12 text-center shadow-pop sm:px-12">
-              <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-accent" />
-              <Sparkles aria-hidden="true" className="mx-auto size-6 text-accent" />
+            <div className="relative overflow-hidden rounded-2xl border border-sage/25 bg-surface-1 px-8 py-12 text-center shadow-pop sm:px-12">
+              <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-sage" />
+              <Sparkles aria-hidden="true" className="mx-auto size-6 text-sage" />
               <h2 className="font-display mx-auto mt-4 max-w-xl text-3xl leading-[1.1] font-semibold tracking-tight text-balance">
                 Like the craft? Come see it running.
               </h2>

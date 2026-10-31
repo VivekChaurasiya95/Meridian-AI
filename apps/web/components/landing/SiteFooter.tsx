@@ -104,7 +104,7 @@ export function SiteFooter() {
               </p>
               <p className="mt-2 max-w-xs text-[13px] text-ink-3">
                 Designed &amp; built by{" "}
-                <Link href="/developer" className="font-semibold text-ink-2 underline decoration-accent/50 decoration-2 underline-offset-4 transition-colors hover:text-accent">
+                <Link href="/developer" className="font-semibold text-ink-2 underline decoration-sage/50 decoration-2 underline-offset-4 transition-colors hover:text-sage">
                   {DEVELOPER.name}
                 </Link>
               </p>
@@ -130,7 +130,7 @@ export function SiteFooter() {
                             href={link.href}
                             target="_blank"
                             rel="noreferrer"
-                            className="group inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 transition-colors hover:text-accent"
+                            className="group inline-flex items-center gap-1 text-[14px] font-medium text-ink-2 transition-colors hover:text-sage"
                           >
                             {link.label}
                             <ArrowUpRight aria-hidden="true" className="size-3.5 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100" />
@@ -140,7 +140,7 @@ export function SiteFooter() {
                         <li key={link.label}>
                           <Link
                             href={link.href}
-                            className="text-[14px] font-medium text-ink-2 underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-accent hover:decoration-accent/60"
+                            className="text-[14px] font-medium text-ink-2 underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60"
                           >
                             {link.label}
                           </Link>
