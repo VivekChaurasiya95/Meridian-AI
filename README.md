@@ -4,11 +4,12 @@ Meridian AI is an AI-assisted software debugging and reliability platform. It tu
 developer's bug report into a structured, evidence-backed investigation: reproduce,
 capture evidence, hypothesize, propose regression tests, review a patch, verify, report.
 
-> **Milestone 1 status (this checkout):** working foundation only — premium app shell,
-> FastAPI backend, PostgreSQL migrations, health probes, and end-to-end workspace
-> management (the first persistent resource). The investigation pipeline
-> (execution, browser reproduction, AI reasoning, patches, verification) arrives in
-> later milestones. The UI never presents unbuilt stages as real.
+> **Milestone 2 status (this checkout):** app shell with brand system, session
+> authentication (signup/login/logout, `/me`), and workspace management with
+> membership roles — all backed by PostgreSQL. Project onboarding and the
+> investigation pipeline (execution, browser reproduction, AI reasoning, patches,
+> verification) arrive in later milestones. The UI never presents unbuilt stages
+> as real.
 
 ## Repository layout
 
@@ -48,15 +49,15 @@ cd services/api
 pip install -e ".[dev]"
 cd ../..
 alembic upgrade head
-uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000
-# -> http://127.0.0.1:8000/health/live
+uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8010
+# -> http://127.0.0.1:8010/health/live
 
 # 4. Frontend (new terminal, from repo root)
 cd apps/web
 npm install
 npm run dev
-# -> http://localhost:3000      landing
-# -> http://localhost:3000/app  workspace home (live API data)
+# -> http://localhost:3010      landing
+# -> http://localhost:3010/app  workspace home (live API data)
 ```
 
 Or run Postgres + API together: `docker compose up --build` (web still runs locally).
@@ -77,18 +78,24 @@ npx playwright install --with-deps chromium   # first time only
 npm run e2e
 ```
 
-## API surface (M1)
+## API surface (M2)
 
 - `GET /health/live` → `{"status":"ok"}` (no auth, no DB)
 - `GET /health/ready` → `{"status":"ready","checks":{…}}` or `503`
+- `POST /api/v1/auth/signup` `{email, password, display_name}` → `201` + session cookie
+- `POST /api/v1/auth/login` `{email, password}` → `200` + session cookie
+- `POST /api/v1/auth/logout` → `204`, clears the cookie
+- `GET /api/v1/me` → current profile; `PATCH /api/v1/me` `{display_name}`
 - `POST /api/v1/workspaces` `{name, slug}` → `201`
 - `GET /api/v1/workspaces?limit&cursor` → paginated envelope
 - `GET /api/v1/workspaces/{id}` → workspace + caller role
 - `PATCH /api/v1/workspaces/{id}` `{name}` → owner/admin only
+- `GET|POST /api/v1/workspaces/{id}/members` → list (members) / add by email (owner/admin)
+- `PATCH|DELETE /api/v1/workspaces/{id}/members/{user_id}` → roles, removal
 
 All `/api/v1` responses use `{data, request_id}` / `{error, request_id}`.
-Authentication arrives in M2; M1 uses an explicit local-developer identity
-(see `services/api/app/api/deps.py` and `docs/DECISIONS.md` D3).
+Sessions travel in the `meridian_session` HttpOnly cookie (`SameSite=Lax`) or
+as `Bearer` tokens; see `docs/DECISIONS.md` D17–D20.
 
 ## License
 
