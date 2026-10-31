@@ -62,6 +62,25 @@ npm run dev
 
 Or run Postgres + API together: `docker compose up --build` (web still runs locally).
 
+### Social sign-in (Google/GitHub via Firebase, optional)
+
+Password auth works with zero setup. To enable the Google/GitHub buttons:
+
+1. In the [Firebase console](https://console.firebase.google.com), create a
+   project (or use an existing one), then **Authentication -> Sign-in
+   method**: enable **Google** and **GitHub**. For GitHub, create a GitHub
+   OAuth App (GitHub Settings -> Developer settings) with authorization
+   callback URL `https://<your-project-id>.firebaseapp.com/__/auth/handler`
+   and paste its client ID/secret into Firebase.
+2. **Authentication -> Settings -> Authorized domains**: add `localhost`.
+3. **Project settings -> Your apps -> Web**: register a web app and copy
+   its config values.
+4. Put the web config in `apps/web/.env.local` (`NEXT_PUBLIC_FIREBASE_*`,
+   see `.env.example`) and set `FIREBASE_PROJECT_ID` in the repo-root
+   `.env`. Restart both servers. The API needs only the project ID; tokens
+   are verified against Google's public certs, so no service-account key
+   is stored anywhere.
+
 ## Checks
 
 ```powershell
@@ -84,6 +103,7 @@ npm run e2e
 - `GET /health/ready` → `{"status":"ready","checks":{…}}` or `503`
 - `POST /api/v1/auth/signup` `{email, password, display_name}` → `201` + session cookie
 - `POST /api/v1/auth/login` `{email, password}` → `200` + session cookie
+- `POST /api/v1/auth/firebase` `{id_token}` → `200` + session cookie (Google/GitHub via Firebase; `503` if `FIREBASE_PROJECT_ID` is unset)
 - `POST /api/v1/auth/logout` → `204`, clears the cookie
 - `GET /api/v1/me` → current profile; `PATCH /api/v1/me` `{display_name}`
 - `POST /api/v1/workspaces` `{name, slug}` → `201`
