@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Meridian design tokens — "Ember & Oak".
+ * Light mode is a warm paper studio; `.dark` is a rich roasted espresso.
+ * Unlayered author styles win over layered @theme output, so the dark block
+ * below reliably replaces every token when next-themes sets the class.
+ */
+@theme {
+  /* Warm paper — light */
+  --color-canvas: #f4eee2;
+  --color-surface-1: #fdfaf3;
+  --color-surface-2: #ece4d2;
+  --color-surface-3: #ddd1b8;
+  --color-inset: #f8f3e7;
+  --color-line: #ddd0b8;
+  --color-line-strong: #c2b294;
+  --color-ink: #221a12;
+  --color-ink-2: #5d5145;
+  --color-ink-3: #8b7f6c;
+  --color-accent: #b4431a;
+  --color-accent-hover: #96340f;
+  --color-accent-pressed: #7c2b0e;
+  --color-accent-subtle: #f3dcc4;
+  --color-accent-ink: #fff8ef;
+  --color-ember: #d9702b;
+  --color-moss: #2e6b4f;
+  --color-teal: #13665c;
+  --color-success: #2c7a4d;
+  --color-warning: #96690f;
+  --color-danger: #b3372f;
+  --color-info: #325fc4;
+  --color-neutral: #6d6355;
+
+  --font-sans: "DM Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", SFMono-Regular, Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  --shadow-card: 0 1px 2px rgb(64 45 20 / 0.08), 0 8px 24px -12px rgb(64 45 20 / 0.25);
+  --shadow-pop: 0 2px 6px rgb(64 45 20 / 0.1), 0 24px 48px -16px rgb(64 45 20 / 0.3);
+  --shadow-glow: 0 0 0 1px rgb(212 112 43 / 0.25), 0 12px 32px -8px rgb(180 67 26 / 0.45);
+
+  --animate-marquee: marquee 36s linear infinite;
+  --animate-ticker: ticker 9s ease-in-out infinite;
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-spin-slow: spin 14s linear infinite;
+  --animate-dropdown-in: dropdown-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-rise-in: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes ticker {
+    0%, 18% { transform: translateY(0); }
+    33%, 51% { transform: translateY(-1.75rem); }
+    66%, 84% { transform: translateY(-3.5rem); }
+    100% { transform: translateY(-5.25rem); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.8); }
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes dropdown-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(18px); filter: blur(4px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+}
+
+.dark {
+  /* Roasted espresso — dark */
+  --color-canvas: #12100b;
+  --color-surface-1: #1b1712;
+  --color-surface-2: #241f17;
+  --color-surface-3: #2f2820;
+  --color-inset: #16120d;
+  --color-line: #332b21;
+  --color-line-strong: #4c4133;
+  --color-ink: #f3ebdb;
+  --color-ink-2: #bfb29c;
+  --color-ink-3: #8c806d;
+  --color-accent: #e89c52;
+  --color-accent-hover: #f2ae6b;
+  --color-accent-pressed: #d98336;
+  --color-accent-subtle: #31230f;
+  --color-accent-ink: #1f1305;
+  --color-ember: #e8763a;
+  --color-moss: #5cb98d;
+  --color-teal: #5fbfb0;
+  --color-success: #5cc993;
+  --color-warning: #e5b45c;
+  --color-danger: #e87a70;
+  --color-info: #84aef0;
+  --color-neutral: #a2977f;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 32px -16px rgb(0 0 0 / 0.55);
+  --shadow-pop: 0 4px 12px rgb(0 0 0 / 0.5), 0 32px 64px -20px rgb(0 0 0 / 0.65);
+  --shadow-glow: 0 0 0 1px rgb(232 156 82 / 0.3), 0 16px 40px -10px rgb(232 156 82 / 0.35);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-sm leading-[22px] text-ink antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 38%, transparent);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Warm thin scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+  }
+
+  /* Fine film grain for large warm surfaces */
+  .texture-grain {
+    position: relative;
+  }
+  .texture-grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  }
+  .dark .texture-grain::after {
+    mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+  }
+
+  /* Warm dotted paper */
+  .texture-dots {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in srgb, var(--color-ink) 14%, transparent) 1px,
+      transparent 0
+    );
+    background-size: 22px 22px;
+  }
+
+  /* Hairline rules with warm fade */
+  .rule-fade {
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--color-line-strong) 18%,
+      var(--color-line-strong) 82%,
+      transparent
+    );
+    height: 1px;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Shimmering skeleton wash */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      100deg,
+      var(--color-surface-2) 30%,
+      var(--color-surface-3) 50%,
+      var(--color-surface-2) 70%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+}

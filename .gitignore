@@ -37,6 +37,7 @@ env/
 ENV/
 .pytest_cache/
 .coverage
+.coverage.*
 coverage.xml
 htmlcov/
 .mypy_cache/
@@ -64,12 +65,18 @@ apps/web/out/
 *.tsbuildinfo
 .turbo/
 .vercel/
+# Firebase (App Hosting build output; project alias file stays committed)
+.firebase/
 
 # Playwright
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+# Auth fixtures (storageState session cookies) — never commit live sessions.
+playwright/.auth/
+e2e/.auth/
+.auth/
 
 # Databases and local storage
 *.sqlite*
@@ -95,5 +102,7 @@ desktop.ini
 *.swp
 *.swo
 *~
+*.orig
+*.rej
 .agents/
 .eden/
