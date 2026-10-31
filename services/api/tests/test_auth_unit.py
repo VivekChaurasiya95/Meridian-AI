@@ -50,17 +50,17 @@ def test_session_token_shape() -> None:
 
 
 def test_signup_schema_policy() -> None:
-    assert SignupRequest(
-        email="User@Example.com", password="ten-chars1", display_name="U"
-    ).password == "ten-chars1"
+    assert (
+        SignupRequest(email="User@Example.com", password="ten-chars1", display_name="U").password
+        == "ten-chars1"
+    )
+    # No strength policy server-side (same floor as login): only empty fails.
     with pytest.raises(ValidationError):
-        SignupRequest(email="u@e.com", password="short", display_name="U")
+        SignupRequest(email="u@e.com", password="", display_name="U")
     with pytest.raises(ValidationError):
         SignupRequest(email="not-an-email", password="long-enough-1", display_name="U")
     with pytest.raises(ValidationError):
-        SignupRequest(
-            email="u@e.com", password="long-enough-1", display_name="U", role="owner"
-        )
+        SignupRequest(email="u@e.com", password="long-enough-1", display_name="U", role="owner")
 
 
 def test_login_schema_requires_password() -> None:

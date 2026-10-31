@@ -31,9 +31,7 @@ def _membership(
     return session.get(WorkspaceMember, (workspace_id, user_id))
 
 
-def _require_membership(
-    session: Session, workspace_id: uuid.UUID, user: User
-) -> WorkspaceMember:
+def _require_membership(session: Session, workspace_id: uuid.UUID, user: User) -> WorkspaceMember:
     workspace = session.get(Workspace, workspace_id)
     member = _membership(session, workspace_id, user.id) if workspace else None
     if workspace is None or member is None:

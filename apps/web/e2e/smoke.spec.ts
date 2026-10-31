@@ -6,7 +6,9 @@ import { expect, test } from "@playwright/test";
  */
 test("landing presents the product without fake claims", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Clarity for complex engineering." })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "One pipeline, from report to verified fix." }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: /open the workspace/i }).first()).toBeVisible();
   await expect(page.getByText("Concept preview", { exact: false })).toBeVisible();
   // No fabricated social proof anywhere on the page.
@@ -22,8 +24,8 @@ test("app shell redirects anonymous visitors to login", async ({ page }) => {
 test("auth pages render honest forms with no API dependency", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
+  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   await page.goto("/signup");
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
-  await expect(page.getByLabel("Confirm password")).toBeVisible();
+  await expect(page.getByLabel("Confirm password", { exact: true })).toBeVisible();
 });

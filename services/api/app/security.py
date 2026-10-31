@@ -78,9 +78,7 @@ class SlidingWindowLimiter:
         self._hits.pop(key, None)
 
 
-def origin_allowed(
-    origin: str | None, referer: str | None, allowed_origins: list[str]
-) -> bool:
+def origin_allowed(origin: str | None, referer: str | None, allowed_origins: list[str]) -> bool:
     """Check an unsafe cookie-authenticated request came from our own frontend.
 
     Compares scheme://host:port exactly against the CORS allowlist. Missing

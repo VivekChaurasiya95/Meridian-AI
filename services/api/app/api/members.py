@@ -10,9 +10,7 @@ from app.envelope import ok
 from app.schemas import MemberCreate, MemberUpdate
 from app.services import members as member_service
 
-router = APIRouter(
-    prefix="/api/v1/workspaces/{workspace_id}/members", tags=["membership"]
-)
+router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/members", tags=["membership"])
 
 
 @router.get("")

@@ -28,8 +28,7 @@ class Settings(BaseSettings):
     # Comma-separated origins. Both loopback spellings are allowed so opening
     # the app via localhost or 127.0.0.1 works identically (D22).
     cors_allow_origins: str = (
-        "http://localhost:3010,http://localhost:3000,"
-        "http://127.0.0.1:3010,http://127.0.0.1:3000"
+        "http://localhost:3010,http://localhost:3000,http://127.0.0.1:3010,http://127.0.0.1:3000"
     )
 
     # Firebase social sign-in (Google/GitHub). Empty disables the endpoint.

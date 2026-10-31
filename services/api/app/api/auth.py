@@ -38,9 +38,7 @@ def _session_cookie(response: JSONResponse, raw_token: str) -> None:
 
 
 @router.post("/signup", status_code=201)
-def signup(
-    payload: SignupRequest, session: DbSession, request_id: RequestId
-) -> JSONResponse:
+def signup(payload: SignupRequest, session: DbSession, request_id: RequestId) -> JSONResponse:
     settings = get_settings()
     data, raw_token = auth_service.signup(session, payload, settings.bcrypt_rounds)
     response = ok(data, request_id, status_code=201)

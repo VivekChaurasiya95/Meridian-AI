@@ -35,9 +35,7 @@ def list_workspaces(
 ) -> JSONResponse:
     settings = get_settings()
     effective_limit = min(limit or settings.page_default_limit, settings.page_max_limit)
-    items, next_cursor = workspace_service.list_workspaces(
-        session, user, effective_limit, cursor
-    )
+    items, next_cursor = workspace_service.list_workspaces(session, user, effective_limit, cursor)
     return paged(items, effective_limit, next_cursor, request_id)
 
 

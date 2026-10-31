@@ -13,11 +13,11 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+psycopg://meridian:meridian@localhost:5432/meridian"
 )
 
-import pathlib  # noqa: E402
+import pathlib
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine, text  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 

@@ -47,9 +47,7 @@ def _new_session(session: Session, user_id: uuid.UUID) -> str:
     return raw_token
 
 
-def signup(
-    session: Session, payload: SignupRequest, bcrypt_rounds: int
-) -> tuple[dict, str]:
+def signup(session: Session, payload: SignupRequest, bcrypt_rounds: int) -> tuple[dict, str]:
     """Create a local user + credential + first session in one transaction."""
     email = payload.email.strip().lower()
     user_id = uuid.uuid4()
@@ -99,9 +97,7 @@ def login(
 ) -> tuple[dict, str]:
     """Authenticate with email + password. Failures are uniform (no enumeration)."""
     if not limiter.allowed(rate_key):
-        raise ApiError(
-            429, "RATE_LIMITED", "Too many login attempts. Try again later."
-        )
+        raise ApiError(429, "RATE_LIMITED", "Too many login attempts. Try again later.")
     email = payload.email.strip().lower()
     user = (
         session.execute(
@@ -113,8 +109,10 @@ def login(
         )
     ).scalar_one_or_none()
     credential = session.get(LocalCredential, user.id) if user else None
-    if user is None or credential is None or not verify_password(
-        payload.password, credential.password_hash
+    if (
+        user is None
+        or credential is None
+        or not verify_password(payload.password, credential.password_hash)
     ):
         limiter.register_failure(rate_key)
         raise ApiError(401, "AUTH_REQUIRED", "Invalid email or password.")

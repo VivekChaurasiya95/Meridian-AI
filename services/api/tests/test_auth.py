@@ -160,8 +160,6 @@ def test_bearer_token_auth_without_origin(client: TestClient) -> None:
     client.cookies.clear()
     headers = {"Authorization": f"Bearer {token}"}
     assert client.get("/api/v1/me", headers=headers).status_code == 200
-    created = client.post(
-        "/api/v1/workspaces", json={"name": "B", "slug": "b"}, headers=headers
-    )
+    created = client.post("/api/v1/workspaces", json={"name": "B", "slug": "b"}, headers=headers)
     assert created.status_code == 201
     assert client.get("/api/v1/me", headers={"Authorization": "Bearer bogus"}).status_code == 401

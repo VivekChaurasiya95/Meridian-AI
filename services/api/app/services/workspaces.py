@@ -56,13 +56,15 @@ def create_workspace(session: Session, user: User, payload: WorkspaceCreate) -> 
         updated_at=now,
     )
     session.add(workspace)
-    session.flush()
-    session.add(
-        WorkspaceMember(
-            workspace_id=workspace.id, user_id=user.id, role="owner", invited_by=user.id
-        )
-    )
     try:
+        # flush() inserts the row, so it must sit inside the try: a
+        # duplicate slug violates workspaces_slug_key here, not at commit.
+        session.flush()
+        session.add(
+            WorkspaceMember(
+                workspace_id=workspace.id, user_id=user.id, role="owner", invited_by=user.id
+            )
+        )
         session.commit()
     except IntegrityError as exc:
         session.rollback()

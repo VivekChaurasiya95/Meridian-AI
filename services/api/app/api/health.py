@@ -25,7 +25,5 @@ def ready() -> JSONResponse:
         "object_storage": "not_configured",
     }
     if not database_ok:
-        return JSONResponse(
-            status_code=503, content={"status": "not_ready", "checks": checks}
-        )
+        return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})
     return JSONResponse(status_code=200, content={"status": "ready", "checks": checks})

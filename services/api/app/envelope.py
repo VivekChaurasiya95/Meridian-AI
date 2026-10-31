@@ -1,4 +1,4 @@
-"""API envelope helpers and typed application errors (API.md §4.1–§4.2)."""
+"""API envelope helpers and typed application errors (API.md §4.1-§4.2)."""
 
 import re
 import uuid
@@ -30,9 +30,7 @@ def ok(data: Any, request_id: str, status_code: int = 200) -> JSONResponse:
     )
 
 
-def paged(
-    items: list[Any], limit: int, next_cursor: str | None, request_id: str
-) -> JSONResponse:
+def paged(items: list[Any], limit: int, next_cursor: str | None, request_id: str) -> JSONResponse:
     return JSONResponse(
         status_code=200,
         content={

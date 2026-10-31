@@ -78,9 +78,9 @@ def create_app() -> FastAPI:
     async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
         request_id = _request_id_from(request)
         logger.exception("Unhandled error (request_id=%s)", request_id)
-        return ApiError(
-            500, "INTERNAL_ERROR", "An unexpected internal failure occurred."
-        ).response(request_id)
+        return ApiError(500, "INTERNAL_ERROR", "An unexpected internal failure occurred.").response(
+            request_id
+        )
 
     application.include_router(health.router)
     application.include_router(auth.router)

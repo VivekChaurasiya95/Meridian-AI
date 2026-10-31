@@ -79,9 +79,7 @@ class UserSession(Base):
 
     __tablename__ = "sessions"
     __table_args__ = (
-        CheckConstraint(
-            "token_hash ~ '^[0-9a-f]{64}$'", name="ck_sessions_token_hash"
-        ),
+        CheckConstraint("token_hash ~ '^[0-9a-f]{64}$'", name="ck_sessions_token_hash"),
         CheckConstraint("expires_at > created_at", name="ck_sessions_expiry"),
         Index("idx_sessions_user", "user_id"),
     )

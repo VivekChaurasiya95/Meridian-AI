@@ -17,7 +17,7 @@ test("login password can be shown and hidden", async ({ page }) => {
 test("signup passwords toggle independently", async ({ page }) => {
   await page.goto("/signup");
   const password = page.getByLabel("Password", { exact: true });
-  const confirm = page.getByLabel("Confirm password");
+  const confirm = page.getByLabel("Confirm password", { exact: true });
   await page.getByRole("button", { name: "Show Confirm password" }).click();
   await expect(confirm).toHaveAttribute("type", "text");
   await expect(password).toHaveAttribute("type", "password");

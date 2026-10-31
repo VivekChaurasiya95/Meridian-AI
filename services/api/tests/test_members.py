@@ -68,9 +68,11 @@ def test_viewer_cannot_manage_members(auth_client_factory: AuthClientFactory) ->
     assert add.status_code == 403
 
     members = viewer.get(f"/api/v1/workspaces/{workspace_id}/members").json()["data"]
-    target = next(m for m in members if m["email"] == "other@example.com") if any(
-        m["email"] == "other@example.com" for m in members
-    ) else None
+    target = (
+        next(m for m in members if m["email"] == "other@example.com")
+        if any(m["email"] == "other@example.com" for m in members)
+        else None
+    )
     assert target is None  # The forbidden add really did not happen.
 
 

@@ -25,7 +25,15 @@ def login_limiter() -> SlidingWindowLimiter:
 
 
 def get_request_id(request: Request) -> str:
-    """Resolve the request ID: client header when sane, else server-generated."""
+    """Resolve the request ID: middleware-attached state first, then header.
+
+    The middleware already honored or generated the ID into request state;
+    re-deriving it here would mint a second ID and disagree with the
+    X-Request-ID response header.
+    """
+    state_id = getattr(request.state, "request_id", None)
+    if isinstance(state_id, str) and state_id:
+        return state_id
     return normalize_request_id(request.headers.get(REQUEST_ID_HEADER))
 
 
