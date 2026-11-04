@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.api.deps import CurrentUser, DbSession, RequestId
 from app.envelope import ok
@@ -55,6 +55,6 @@ def remove_member(
     session: DbSession,
     user: CurrentUser,
     request_id: RequestId,
-) -> JSONResponse:
+) -> Response:
     member_service.remove_member(session, user, workspace_id, target_user_id)
-    return JSONResponse(status_code=204, content=None)
+    return Response(status_code=204)

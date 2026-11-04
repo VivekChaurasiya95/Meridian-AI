@@ -1,7 +1,7 @@
 """Session auth routes: signup, login, logout."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.api.deps import DbSession, RequestId, bearer_or_cookie_token, login_limiter
 from app.config import get_settings
@@ -85,11 +85,11 @@ def firebase_login(
 
 
 @router.post("/logout", status_code=204)
-def logout(request: Request, session: DbSession) -> JSONResponse:
+def logout(request: Request, session: DbSession) -> Response:
     # Idempotent: unknown or missing tokens still clear both cookies.
     auth_service.logout(session, bearer_or_cookie_token(request))
     settings = get_settings()
-    response = JSONResponse(status_code=204, content=None)
+    response = Response(status_code=204)
     response.delete_cookie(key=settings.session_cookie_name, path="/")
     response.delete_cookie(key=settings.session_cookie_name + "_present", path="/")
     return response
