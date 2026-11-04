@@ -38,11 +38,11 @@ evidence, hypothesize, test, patch, verify, report — with a human approving ev
 - [📄 License](#-license)
 - [👨‍💻 Author](#-author)
 
-> **Milestone 2 status (this checkout):** app shell with brand system, session
-> authentication (email/password plus Google/GitHub via Firebase), and workspace
-> management with membership roles — all backed by PostgreSQL. Project onboarding
-> and the investigation pipeline (execution, browser reproduction, AI reasoning,
-> patches, verification) arrive in later milestones. The UI never presents unbuilt
+> **Milestone 3 status (this checkout):** everything from Milestone 2, plus
+> project management — ZIP upload with hostile-archive validation, static stack
+> inspection, immutable snapshots, repository browsing, and project settings.
+> The investigation pipeline (execution, browser reproduction, AI reasoning,
+> patches, verification) arrives in later milestones. The UI never presents unbuilt
 > stages as real.
 
 Spec authority: `SECURITY.md` > PRD > `ARCHITECTURE.md`/`API.md` > `DATABASE.md` >
@@ -57,6 +57,7 @@ Spec authority: `SECURITY.md` > PRD > `ARCHITECTURE.md`/`API.md` > `DATABASE.md`
 | 🔑 **Session auth** | Email/password signup, login, logout, `/me` profile — opaque server-side sessions |
 | 🌐 **Social login** | Google and GitHub sign-in via Firebase, exchanged for the same session cookie |
 | 🏢 **Workspaces** | Create/rename workspaces, cursor pagination, role-based membership (owner/admin/developer/viewer) |
+| 📦 **Projects** | ZIP upload with archive validation, stack inspection, immutable snapshots, repo browser, settings |
 | 🎥 **Product tour** | Animated explainer of the investigation loop, or attach your own demo video |
 | 🔬 **Playground** | Interactive desktop scene: feed a file, pick a workflow, watch the agents work |
 | 👨‍💻 **Developer page** | Meet-the-developer story, stack, and project highlights |
@@ -84,7 +85,7 @@ flowchart LR
     API --> DB[("PostgreSQL 16<br/>:5435")]
     Web --> Firebase(["Firebase Auth<br/>Google · GitHub"])
     API -. "M3+ evidence store" .-> MinIO[("MinIO<br/>:9010")]
-    API -. "M5 worker (stub)" .-> Worker["Sandbox runner"]
+    API -. "M4 job queue" .-> Worker["Job worker"]
 ```
 
 | Service | Tech | Port | Purpose |
@@ -93,7 +94,7 @@ flowchart LR
 | `api` | FastAPI + SQLAlchemy + Alembic | 8010 | REST API, sessions, workspaces |
 | `db` | PostgreSQL 16 | 5435 | Users, sessions, workspaces, members |
 | `minio` | MinIO (S3-compatible) | 9010 / 9011 | Evidence object storage (M3+) |
-| `worker` | Python stub | — | Isolated execution sandbox (M5) |
+| `worker` | Python job worker | — | Durable jobs, safe internal types only (M4); execution sandbox stays M5 |
 
 ## 🧰 Tech Stack
 
@@ -187,8 +188,8 @@ apps/web/               Next.js frontend (App Router, TypeScript, Tailwind v4)
 ├── e2e/                Playwright specs (run by CI, no backend required)
 └── public/             Brand art + developer portrait
 services/api/           FastAPI backend (app/*) with co-located tests
-services/worker/        (M5) isolated execution worker — stub for now
-services/orchestrator/  (M4+) investigation state machine — not yet built
+services/worker/        (M4) durable job worker — safe internal job types only
+services/orchestrator/  (M4+) investigation state machine — job stages persist; full engine later
 migrations/             Alembic migrations (PostgreSQL, versioned)
 docs/DECISIONS.md       Working architecture decision log
 public/                 Product specifications (source of truth; never edited)
@@ -274,8 +275,8 @@ theme, API-base units).
 
 - [x] **M1** — App shell, brand system, landing page
 - [x] **M2** — Session auth (password + Firebase social), workspaces, membership roles
-- [ ] **M3** — Project onboarding, MinIO evidence storage
-- [ ] **M4** — Investigation state machine (orchestrator)
+- [x] **M3** — Project onboarding (ZIP validation, inspection, snapshots), MinIO reserved for M3+ evidence
+- [x] **M4** — Durable jobs + leases/recovery + worker (ruff/mypy/pytest + lint/typecheck/build green)
 - [ ] **M5** — Isolated execution worker (sandbox)
 - [ ] **M6–M10** — Browser reproduction, AI reasoning, patches, verification, reporting
 
