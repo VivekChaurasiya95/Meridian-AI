@@ -317,28 +317,35 @@ def test_daemon_recovery_prunes_stale_keeps_live(
     session = db_session_factory()
     try:
         lifecycle.create_execution(
-            session, execution_id=uuid.UUID(hex=live_id), job_id=job_id,
-            worker_id="w-rc", snapshot_id=uuid.UUID(snapshot["id"]),
-            profile="sandbox_smoke", attempt=claimed["attempts"],
+            session,
+            execution_id=uuid.UUID(hex=live_id),
+            job_id=job_id,
+            worker_id="w-rc",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"],
         )
         lifecycle.create_execution(
-            session, execution_id=uuid.UUID(hex=stale_id), job_id=job_id,
-            worker_id="w-rc", snapshot_id=uuid.UUID(snapshot["id"]),
-            profile="sandbox_smoke", attempt=claimed["attempts"] + 1,
+            session,
+            execution_id=uuid.UUID(hex=stale_id),
+            job_id=job_id,
+            worker_id="w-rc",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"] + 1,
         )
         lifecycle.finish_execution(
-            session, uuid.UUID(hex=stale_id), status="failed",
-            error_code="COMMAND_FAILED", error_message="boom",
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
         )
     finally:
         session.close()
     policy = get_policy("sandbox_smoke")
-    live = container_runtime.create_container(
-        docker_client, _sleep_spec(policy, live_id, 120)
-    )
-    stale = container_runtime.create_container(
-        docker_client, _sleep_spec(policy, stale_id, 120)
-    )
+    live = container_runtime.create_container(docker_client, _sleep_spec(policy, live_id, 120))
+    stale = container_runtime.create_container(docker_client, _sleep_spec(policy, stale_id, 120))
     try:
         live.start()
         stale.start()
@@ -351,9 +358,7 @@ def test_daemon_recovery_prunes_stale_keeps_live(
         docker_client.containers.get(live.name)
         check = db_session_factory()
         try:
-            assert check.get(SandboxExecution, uuid.UUID(hex=live_id)).cleanup_status == (
-                "pending"
-            )
+            assert check.get(SandboxExecution, uuid.UUID(hex=live_id)).cleanup_status == ("pending")
             assert check.get(SandboxExecution, uuid.UUID(hex=stale_id)).cleanup_status == (
                 "cleaned"
             )
@@ -382,7 +387,9 @@ def test_daemon_build_memory_cap_enforced(
         try:
             with pytest.raises(SandboxError) as exc_info:
                 container_runtime.build_source_image(
-                    client=docker_client, context_tar=context, tag=tag,
+                    client=docker_client,
+                    context_tar=context,
+                    tag=tag,
                     memory_bytes=4 * 1024 * 1024,
                 )
             assert exc_info.value.code == "IMAGE_BUILD_FAILED"

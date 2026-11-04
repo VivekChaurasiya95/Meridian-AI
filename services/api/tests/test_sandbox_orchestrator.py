@@ -529,7 +529,9 @@ def test_prune_removes_stale_containers(
 
     result = lifecycle.prune_stale_containers(client, is_live)
     assert result == {
-        "pruned": 2, "kept": 1, "failed": 0,
+        "pruned": 2,
+        "kept": 1,
+        "failed": 0,
         "pruned_ids": sorted([stale_id, "b" * 32]),
     }
     assert live.removed is False
@@ -566,9 +568,13 @@ def _live_execution(db_session_factory, job_id, worker, snapshot_id, attempt):  
     session = db_session_factory()
     try:
         lifecycle.create_execution(
-            session, execution_id=uuid.UUID(hex=execution_id), job_id=uuid.UUID(job_id),
-            worker_id=worker, snapshot_id=uuid.UUID(snapshot_id),
-            profile="sandbox_smoke", attempt=attempt,
+            session,
+            execution_id=uuid.UUID(hex=execution_id),
+            job_id=uuid.UUID(job_id),
+            worker_id=worker,
+            snapshot_id=uuid.UUID(snapshot_id),
+            profile="sandbox_smoke",
+            attempt=attempt,
         )
     finally:
         session.close()
@@ -576,9 +582,7 @@ def _live_execution(db_session_factory, job_id, worker, snapshot_id, attempt):  
 
 
 def _managed_container(execution_id: str) -> FakeContainer:
-    return FakeContainer(
-        labels={"meridian.managed": "true", "meridian.execution_id": execution_id}
-    )
+    return FakeContainer(labels={"meridian.managed": "true", "meridian.execution_id": execution_id})
 
 
 def _cleanup_status(db_session_factory, execution_id: str):  # type: ignore[no-untyped-def]
@@ -608,8 +612,11 @@ def test_recovery_keeps_live_prunes_stale_and_marks_rows(
     session = db_session_factory()
     try:
         lifecycle.finish_execution(
-            session, uuid.UUID(hex=stale_id), status="failed",
-            error_code="COMMAND_FAILED", error_message="boom",
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
         )
     finally:
         session.close()
@@ -644,8 +651,7 @@ def test_recovery_reclaimed_job_is_stale(
         db_session_factory, claimed["id"], "w-a", snapshot["id"], claimed["attempts"]
     )
     db_session.execute(
-        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute'"
-             " WHERE id = :id"),
+        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute' WHERE id = :id"),
         {"id": claimed["id"]},
     )
     db_session.commit()
@@ -653,9 +659,7 @@ def test_recovery_reclaimed_job_is_stale(
     assert reclaimed is not None and reclaimed["worker_id"] == "w-b"
     container = _managed_container(old_id)
 
-    result = lifecycle.recover_orphans(
-        db_session_factory, FakeClient(FakeContainers([container]))
-    )
+    result = lifecycle.recover_orphans(db_session_factory, FakeClient(FakeContainers([container])))
 
     assert result["pruned"] == 1
     assert container.removed is True
@@ -698,8 +702,11 @@ def test_recovery_idempotent(
     session = db_session_factory()
     try:
         lifecycle.finish_execution(
-            session, uuid.UUID(hex=stale_id), status="failed",
-            error_code="COMMAND_FAILED", error_message="boom",
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
         )
     finally:
         session.close()
@@ -728,8 +735,11 @@ def test_recovery_db_outage_keeps_containers(
     session = db_session_factory()
     try:
         lifecycle.finish_execution(
-            session, uuid.UUID(hex=stale_id), status="failed",
-            error_code="COMMAND_FAILED", error_message="boom",
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
         )
     finally:
         session.close()
@@ -738,9 +748,7 @@ def test_recovery_db_outage_keeps_containers(
     def broken_factory():  # type: ignore[no-untyped-def]
         raise RuntimeError("database unreachable")
 
-    result = lifecycle.recover_orphans(
-        broken_factory, FakeClient(FakeContainers([container]))
-    )
+    result = lifecycle.recover_orphans(broken_factory, FakeClient(FakeContainers([container])))
 
     assert result["pruned"] == 0
     assert result["kept"] == 1

@@ -14,6 +14,7 @@ const COLUMNS: { title: string; links: { label: string; href: string; external?:
     links: [
       { label: "Workflow", href: "/#workflow" },
       { label: "Principles", href: "/#principles" },
+      { label: "Documentation", href: "/docs" },
       { label: "Demo video", href: "/#demo" },
       { label: "FAQ", href: "/#faq" },
       { label: "Build status", href: "/#status" },

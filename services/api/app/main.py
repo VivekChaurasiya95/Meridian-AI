@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
-from app.api import auth, health, jobs, members, projects, users, workspaces
+from app.api import auth, git_imports, health, jobs, members, projects, users, workspaces
 from app.config import get_settings
 from app.envelope import (
     REQUEST_ID_HEADER,
@@ -88,6 +88,7 @@ def create_app() -> FastAPI:
     application.include_router(workspaces.router)
     application.include_router(members.router)
     application.include_router(projects.router)
+    application.include_router(git_imports.router)
     application.include_router(jobs.router)
     return application
 

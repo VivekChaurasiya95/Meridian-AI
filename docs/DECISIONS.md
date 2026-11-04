@@ -341,3 +341,17 @@ contracts > Database spec > Design system > Implementation plan > existing code.
   API still runs on root credentials until its cutover is separately
   approved. Worker-secret and root rotations are pending, in that
   order, root last.
+- **D60 — Public GitHub import (closes O2 for public GitHub only).**
+  Design: `docs/GIT_IMPORT_DESIGN.md` (approved). Canonical
+  `https://github.com/<owner>/<repo>` only; API validates grammar and
+  enqueues `git_preview`/`git_import` jobs (migration 007) but never
+  runs git or DNS for fetching; the trusted worker resolves, rejects
+  non-public answers, pins `github.com:443` via
+  `http.curloptResolve`, disables redirects (renamed repos fail),
+  hooks, filters, submodules and LFS, fetches one ref at depth 1, and
+  pins the snapshot to the resolved commit SHA. Trees pass the ZIP
+  skip/secret policy plus symlink/Windows-path rejection, then the
+  shared `snapshot_from_tree` core (deterministic tar, content-addressed
+  MinIO, read-back verify) — identical trees dedup across ZIP and Git.
+  Per-file cap 25 MiB (operator config). No tokens, no private repos,
+  no arbitrary Git servers in this phase.

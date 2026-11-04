@@ -1,0 +1,36 @@
+export default async function workflow(host) {
+  const evidenceSchema = {
+    type: "object",
+    required: ["complete", "evidence", "unresolved"],
+    properties: {
+      complete: { type: "boolean" },
+      evidence: { type: "array", items: { type: "string" } },
+      unresolved: { type: "array", items: { type: "string" } },
+    },
+  };
+  const reports = await host.parallel([
+    {
+      label: "Ingestion pipeline",
+      input: "Audit ZIP ingestion and snapshot pipeline for Git import reuse. Open and cite: services/api/app/services/ingestion.py, services/api/app/services/storage.py, services/api/app/services/object_store.py, services/api/app/services/archive_security.py, services/api/app/models.py. Return complete/evidence/unresolved with file:line evidence, digest/hash algorithm, limits, dedup, MinIO keys, snapshot provenance gaps. Read bodies, not just search hits.",
+      schema: evidenceSchema,
+    },
+    {
+      label: "API worker sandbox",
+      input: "Audit API routes + jobs + worker/sandbox. Open and cite: project creation APIs, services/api/app/api/projects.py, services/api/app/services/projects.py, services/api/app/services/jobs.py, worker entrypoints, sandbox runtime/lifecycle/orchestrator, docker-compose.yml. Return complete/evidence/unresolved with file:line evidence on job types, claim/lease, network modes, timeouts, who can run git today.",
+      schema: evidenceSchema,
+    },
+    {
+      label: "Frontend and policy",
+      input: "Audit project creation wizard, SECURITY.md, docs/DECISIONS.md. Find Git disabled UI, ZIP upload flow, error display, design tokens, D-decisions constraining auth/workspace/sandbox/network/storage. Return complete/evidence/unresolved with file:line evidence and exact wizard file paths.",
+      schema: evidenceSchema,
+    },
+  ]);
+  const critic = await host.agent({
+    label: "Completeness critic",
+    input: `Find concrete gaps this design must answer given evidence: ${reports.map(r => r ? (r.text || '') + ' notes:' + (r.notes || '') : 'null').join('\n---\n')}. Return complete/evidence/unresolved. Focus: DNS pinning TOCTOU on Windows, git CLI hardening flags, snapshot provenance columns, branch/SHA API, job vs sync ingestion placement, tests without real network.`,
+    schema: evidenceSchema,
+  });
+  const all = reports.filter(Boolean).map(r => r.text || '');
+  const critText = critic ? (critic.text || '') : 'critic unavailable';
+  return { summary: JSON.stringify({ phase: 'audit-draft-material', reports: all, critic: critText, criticRef: critic?.ref || null, reportRefs: reports.map(r => r?.ref || null) }) };
+}

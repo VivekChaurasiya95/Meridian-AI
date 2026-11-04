@@ -160,6 +160,49 @@ def create_project(
     return serialize_project(project, role)
 
 
+def create_git_project_record(
+    session: Session,
+    user: User,
+    workspace_id: uuid.UUID,
+    *,
+    name: str,
+    slug: str,
+    description: str | None,
+    canonical_url: str,
+    branch: str | None,
+) -> tuple[Project, str]:
+    """Create a git_provider project row (no fetch; worker imports)."""
+    role = require_roles(session, user, workspace_id, CONTRIBUTOR_ROLES)
+    now = dt.datetime.now(dt.UTC)
+    project = Project(
+        id=uuid.uuid4(),
+        workspace_id=workspace_id,
+        created_by=user.id,
+        name=name,
+        slug=slug,
+        description=description,
+        source_type="git_provider",
+        repository_url=canonical_url,
+        default_branch=branch,
+        status="active",
+        runtime_profile={},
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(project)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        if "uq_projects_workspace_slug" not in str(getattr(exc, "orig", exc)):
+            raise
+        raise ApiError(
+            409, "RESOURCE_CONFLICT", "A project with this slug already exists in the workspace."
+        ) from exc
+    session.refresh(project)
+    return project, role
+
+
 def list_projects(
     session: Session,
     user: User,

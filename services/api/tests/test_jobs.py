@@ -268,8 +268,7 @@ def test_workspace_cap_yields_to_other_workspaces(
     second = job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1)
     assert second is not None and second["workspace_id"] == ws_b["id"]
     assert (
-        job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1)
-        is None
+        job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1) is None
     )
 
 
@@ -281,15 +280,12 @@ def test_expired_lease_does_not_count_toward_cap(
     claimed = job_service.claim_job(db_session, "w-e1", ("lifecycle_test",), 60, workspace_cap=1)
     assert claimed is not None
     db_session.execute(
-        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute'"
-             " WHERE id = :id"),
+        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute' WHERE id = :id"),
         {"id": claimed["id"]},
     )
     db_session.commit()
     # The expired lease is reclaimable, not live: the cap must not block it.
-    reclaimed = job_service.claim_job(
-        db_session, "w-e2", ("lifecycle_test",), 60, workspace_cap=1
-    )
+    reclaimed = job_service.claim_job(db_session, "w-e2", ("lifecycle_test",), 60, workspace_cap=1)
     assert reclaimed is not None and reclaimed["id"] == claimed["id"]
     assert reclaimed["attempts"] == claimed["attempts"] + 1
 
@@ -303,9 +299,7 @@ def test_claim_cap_defaults_to_trusted_setting(
     assert claimed is not None
 
 
-def test_invalid_workspace_cap_rejected(
-    auth_client: TestClient, db_session: Session
-) -> None:
+def test_invalid_workspace_cap_rejected(auth_client: TestClient, db_session: Session) -> None:
     ws = make_workspace(auth_client, "wscap-x")
     assert submit(auth_client, ws["id"]).status_code == 201
     with pytest.raises(ApiError) as exc_info:

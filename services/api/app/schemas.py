@@ -83,11 +83,29 @@ class ProjectUpdate(StrictModel):
     description: str | None = Field(default=None, max_length=2000)
 
 
+class GitValidateRequest(StrictModel):
+    repository_url: str = Field(min_length=1, max_length=2048)
+
+
+class GitImportCreate(StrictModel):
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=100, pattern=SLUG_PATTERN)
+    description: str | None = Field(default=None, max_length=2000)
+    repository_url: str = Field(min_length=1, max_length=2048)
+    branch: str | None = Field(default=None, max_length=256)
+    commit_sha: str | None = Field(default=None, max_length=40)
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.\-]+$"
+    )
+
+
 class JobSubmit(StrictModel):
     # Payload stays a caller-supplied object; the worker validates the
     # fields its own job type needs. Result/worker internals are never
     # accepted here.
-    job_type: Literal["lifecycle_test", "manifest_recheck", "sandbox_smoke"]
+    job_type: Literal[
+        "lifecycle_test", "manifest_recheck", "sandbox_smoke", "git_preview", "git_import"
+    ]
     payload: dict = Field(default_factory=dict)
     idempotency_key: str | None = Field(
         default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.\-]+$"

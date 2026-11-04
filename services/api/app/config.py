@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     # count (they are reclaimable, not live).
     sandbox_max_running_jobs_per_workspace: int = Field(default=10, ge=1, le=1000)
 
+    # Git import (public GitHub only). Trusted operator configuration:
+    # API payloads can never override these. File-count/bytes/depth reuse
+    # the archive caps so ZIP and Git share one resource language.
+    git_import_timeout_seconds: int = Field(default=120, ge=10, le=600)
+    git_import_max_file_mb: int = Field(default=25, ge=1, le=256)
+    git_import_max_attempts: int = Field(default=2, ge=1, le=5)
+
     # Immutable snapshot content storage (M5.1, private MinIO bucket).
     # NOTE for local runs: the host-mapped MinIO API port is 9010, so a
     # local .env needs S3_ENDPOINT_URL=http://localhost:9010 (the
@@ -94,6 +101,10 @@ class Settings(BaseSettings):
     @property
     def extracted_max_bytes(self) -> int:
         return self.extracted_max_mb * 1024 * 1024
+
+    @property
+    def git_import_max_file_bytes(self) -> int:
+        return self.git_import_max_file_mb * 1024 * 1024
 
     @field_validator("database_url")
     @classmethod

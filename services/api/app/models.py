@@ -261,7 +261,8 @@ class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
         CheckConstraint(
-            "job_type IN ('lifecycle_test', 'manifest_recheck', 'sandbox_smoke')",
+            "job_type IN ('lifecycle_test', 'manifest_recheck', 'sandbox_smoke', "
+            "'git_preview', 'git_import')",
             name="ck_jobs_type",
         ),
         CheckConstraint(

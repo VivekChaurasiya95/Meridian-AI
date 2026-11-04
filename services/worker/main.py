@@ -50,7 +50,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("meridian.worker")
 
-SAFE_JOB_TYPES = ("lifecycle_test", "manifest_recheck", "sandbox_smoke")
+SAFE_JOB_TYPES = (
+    "lifecycle_test",
+    "manifest_recheck",
+    "sandbox_smoke",
+    "git_preview",
+    "git_import",
+)
 
 _stop = False
 
@@ -82,7 +88,9 @@ class JobFailure(Exception):
         self.retryable = retryable
 
 
-def stage(session: Session, job_id: uuid.UUID, worker_id: str, key: str, status: str, **kwargs) -> None:  # type: ignore[no-untyped-def]
+def stage(
+    session: Session, job_id: uuid.UUID, worker_id: str, key: str, status: str, **kwargs
+) -> None:  # type: ignore[no-untyped-def]
     job_service.record_stage(session, job_id, worker_id, key, status, **kwargs)
 
 
@@ -90,7 +98,14 @@ def handle_lifecycle_test(session: Session, job: dict, worker_id: str) -> dict:
     note = str(job["payload"].get("note", ""))[:500]
     job_id = uuid.UUID(job["id"])
     stage(session, job_id, worker_id, "setup", "running")
-    stage(session, job_id, worker_id, "setup", "completed", result_summary={"worker": worker_id})
+    stage(
+        session,
+        job_id,
+        worker_id,
+        "setup",
+        "completed",
+        result_summary={"worker": worker_id},
+    )
     stage(session, job_id, worker_id, "execute", "running")
     stage(
         session,
@@ -108,7 +123,9 @@ def handle_manifest_recheck(session: Session, job: dict, worker_id: str) -> dict
     try:
         snapshot_id = uuid.UUID(str(job["payload"].get("snapshot_id")))
     except (ValueError, TypeError, AttributeError):
-        raise JobFailure("INVALID_PAYLOAD", "manifest_recheck needs a snapshot_id.", False) from None
+        raise JobFailure(
+            "INVALID_PAYLOAD", "manifest_recheck needs a snapshot_id.", False
+        ) from None
     stage(session, job_id, worker_id, "fetch_manifest", "running")
     rows = list(
         session.execute(
@@ -119,32 +136,58 @@ def handle_manifest_recheck(session: Session, job: dict, worker_id: str) -> dict
     )
     stored = (
         session.execute(
-            select(RepositorySnapshot.tree_digest).where(RepositorySnapshot.id == snapshot_id)
+            select(RepositorySnapshot.tree_digest).where(
+                RepositorySnapshot.id == snapshot_id
+            )
         )
     ).scalar_one_or_none()
     if stored is None:
         stage(
-            session, job_id, worker_id, "fetch_manifest", "failed",
-            error_code="SNAPSHOT_NOT_FOUND", error_message="The snapshot no longer exists.",
+            session,
+            job_id,
+            worker_id,
+            "fetch_manifest",
+            "failed",
+            error_code="SNAPSHOT_NOT_FOUND",
+            error_message="The snapshot no longer exists.",
         )
         raise JobFailure("SNAPSHOT_NOT_FOUND", "The snapshot no longer exists.", False)
     stage(
-        session, job_id, worker_id, "fetch_manifest", "completed",
+        session,
+        job_id,
+        worker_id,
+        "fetch_manifest",
+        "completed",
         result_summary={"file_count": len(rows)},
     )
     stage(session, job_id, worker_id, "verify_digest", "running")
     digest = compute_tree_digest(
-        [ValidatedEntry(path=path, size=size, sha256=digest) for path, size, digest in rows]
+        [
+            ValidatedEntry(path=path, size=size, sha256=digest)
+            for path, size, digest in rows
+        ]
     )
     match = digest == stored
     stage(
-        session, job_id, worker_id, "verify_digest",
+        session,
+        job_id,
+        worker_id,
+        "verify_digest",
         "completed" if match else "failed",
         result_summary={"match": match, "file_count": len(rows)},
-        **({} if match else {"error_code": "DIGEST_MISMATCH", "error_message": "Stored digest differs."}),
+        **(
+            {}
+            if match
+            else {
+                "error_code": "DIGEST_MISMATCH",
+                "error_message": "Stored digest differs.",
+            }
+        ),
     )
     if not match:
-        raise JobFailure("DIGEST_MISMATCH", "The stored digest differs from recomputed.", False)
+        raise JobFailure(
+            "DIGEST_MISMATCH", "The stored digest differs from recomputed.", False
+        )
     return {"match": True, "file_count": len(rows), "tree_digest": digest}
 
 
@@ -174,14 +217,46 @@ def handle_sandbox_smoke(session: Session, job: dict, worker_id: str) -> dict:
         raise JobFailure(exc.code, exc.message, exc.retryable) from None
 
 
+def _handle_git(session: Session, job: dict, worker_id: str, preview: bool) -> dict:
+    from app.services.git_url_policy import GitUrlError
+
+    from git_import.handlers import handle_git_import, handle_git_preview
+    from git_import.runner import GitFetchError
+
+    try:
+        return (
+            handle_git_preview(session, job, worker_id)
+            if preview
+            else handle_git_import(session, job, worker_id)
+        )
+    except GitFetchError as exc:
+        raise JobFailure(exc.code, exc.message, exc.retryable) from None
+    except GitUrlError as exc:
+        raise JobFailure(exc.code, exc.message, False) from None
+    except ApiError as exc:
+        raise JobFailure(exc.code, exc.message, exc.status_code in (429, 503)) from None
+
+
+def handle_git_preview(session: Session, job: dict, worker_id: str) -> dict:
+    return _handle_git(session, job, worker_id, True)
+
+
+def handle_git_import(session: Session, job: dict, worker_id: str) -> dict:
+    return _handle_git(session, job, worker_id, False)
+
+
 HANDLERS = {
     "lifecycle_test": handle_lifecycle_test,
     "manifest_recheck": handle_manifest_recheck,
     "sandbox_smoke": handle_sandbox_smoke,
+    "git_preview": handle_git_preview,
+    "git_import": handle_git_import,
 }
 
 
-def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds: int) -> None:
+def process_job(
+    job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds: int
+) -> None:
     job_id = uuid.UUID(job["id"])
     lease_lost = threading.Event()
 
@@ -195,7 +270,9 @@ def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds
                     logger.warning("lease lost during execution job_id=%s", job_id)
                     lease_lost.set()
                 else:
-                    logger.warning("heartbeat failed job_id=%s code=%s", job_id, exc.code)
+                    logger.warning(
+                        "heartbeat failed job_id=%s code=%s", job_id, exc.code
+                    )
             except Exception:
                 logger.exception("heartbeat error job_id=%s", job_id)
 
@@ -204,7 +281,11 @@ def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds
     try:
         handler = HANDLERS.get(job["job_type"])
         if handler is None:
-            raise JobFailure("JOB_TYPE_NOT_IMPLEMENTED", "This worker cannot run this job type.", False)
+            raise JobFailure(
+                "JOB_TYPE_NOT_IMPLEMENTED",
+                "This worker cannot run this job type.",
+                False,
+            )
         with session_scope() as session:
             result = handler(session, job, worker_id)
         try:
@@ -216,7 +297,12 @@ def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds
         try:
             with session_scope() as session:
                 job_service.fail_job(
-                    session, job_id, worker_id, failure.code, failure.message, failure.retryable
+                    session,
+                    job_id,
+                    worker_id,
+                    failure.code,
+                    failure.message,
+                    failure.retryable,
                 )
         except ApiError as exc:
             logger.warning("failure record refused job_id=%s code=%s", job_id, exc.code)
@@ -224,9 +310,13 @@ def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds
         logger.exception("unexpected worker error job_id=%s", job_id)
         try:
             with session_scope() as session:
-                job_service.fail_job(session, job_id, worker_id, "WORKER_ERROR", str(exc)[:500], True)
+                job_service.fail_job(
+                    session, job_id, worker_id, "WORKER_ERROR", str(exc)[:500], True
+                )
         except ApiError as nested:
-            logger.warning("failure record refused job_id=%s code=%s", job_id, nested.code)
+            logger.warning(
+                "failure record refused job_id=%s code=%s", job_id, nested.code
+            )
     finally:
         lease_lost.set()
         heartbeat.join(timeout=heartbeat_seconds)
@@ -251,7 +341,9 @@ def _recover_orphans_at_startup() -> None:
         return
     logger.info(
         "startup orphan recovery pruned=%d kept=%d failed=%d",
-        outcome["pruned"], outcome["kept"], outcome["failed"],
+        outcome["pruned"],
+        outcome["kept"],
+        outcome["failed"],
     )
 
 
@@ -265,7 +357,10 @@ def main() -> None:
     poll_seconds = settings.worker_poll_seconds
     logger.info(
         "worker starting worker_id=%s lease_s=%d heartbeat_s=%d poll_s=%d",
-        worker_id, lease_seconds, heartbeat_seconds, poll_seconds,
+        worker_id,
+        lease_seconds,
+        heartbeat_seconds,
+        poll_seconds,
     )
     # Fail fast when the database is unreachable (compose depends_on covers it).
     with session_scope() as session:
@@ -274,7 +369,9 @@ def main() -> None:
     while not _stop:
         claimed: dict | None = None
         with session_scope() as session:
-            claimed = job_service.claim_job(session, worker_id, SAFE_JOB_TYPES, lease_seconds)
+            claimed = job_service.claim_job(
+                session, worker_id, SAFE_JOB_TYPES, lease_seconds
+            )
         if claimed is None:
             time.sleep(poll_seconds)
             continue

@@ -56,6 +56,7 @@ export default function LandingPage() {
             <a href="#workflow" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Workflow</a>
             <a href="#principles" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Principles</a>
             <a href="#demo" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Demo</a>
+            <Link href="/docs" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Documentation</Link>
             <a href="#faq" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">FAQ</a>
             <a href="#status" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Status</a>
             <Link href="/developer" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Developer</Link>

@@ -14,10 +14,14 @@ import {
 } from "lucide-react";
 import {
   MeridianApiError,
+  createGitImport,
   createProject,
   formatBytes,
+  getJob,
   listWorkspaces,
+  submitJob,
   uploadProjectArchive,
+  validateGitUrl,
 } from "@/lib/api";
 import type { UploadResult, Workspace } from "@/lib/types";
 import { Alert } from "@/components/ui/Alert";
@@ -113,6 +117,14 @@ export default function NewProjectPage() {
   const [fieldErrors, setFieldErrors] = React.useState<{ name?: string; slug?: string }>({});
   const [phase, setPhase] = React.useState<Phase>({ name: "form" });
   const [result, setResult] = React.useState<UploadResult | null>(null);
+  const [source, setSource] = React.useState<"zip" | "git">("zip");
+  const [gitUrl, setGitUrl] = React.useState("");
+  const [gitCanonical, setGitCanonical] = React.useState<string | null>(null);
+  const [gitBranches, setGitBranches] = React.useState<{ name: string; commit_sha: string }[]>([]);
+  const [gitBranch, setGitBranch] = React.useState("");
+  const [gitSha, setGitSha] = React.useState("");
+  const [gitBusy, setGitBusy] = React.useState(false);
+  const [gitError, setGitError] = React.useState<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -164,6 +176,85 @@ export default function NewProjectPage() {
     setFile(next);
     if (!name) setName(suggestName(next.name));
     if (!slugTouched) setSlug(suggestSlug(suggestName(next.name)));
+  }
+
+  async function handleGitCheck() {
+    if (!workspaceId) return;
+    setGitBusy(true);
+    setGitError(null);
+    setGitBranches([]);
+    try {
+      const valid = await validateGitUrl(gitUrl.trim());
+      setGitCanonical(valid.canonical_url);
+      if (!name) setName(suggestName(valid.repo));
+      if (!slugTouched) setSlug(suggestSlug(valid.repo));
+      const job = await submitJob(workspaceId, {
+        job_type: "git_preview",
+        payload: { repository_url: valid.canonical_url },
+      });
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await getJob(job.id);
+        if (current.status === "completed") {
+          const branches = (current.result?.branches ?? []) as {
+            name: string;
+            commit_sha: string;
+          }[];
+          setGitBranches(branches);
+          const fallback = (current.result?.default_branch as string | undefined) ?? branches[0]?.name ?? "";
+          setGitBranch(fallback);
+          return;
+        }
+        if (current.status === "failed" || current.status === "cancelled") {
+          throw new Error(current.error_message ?? "Could not read this repository.");
+        }
+      }
+      throw new Error("Repository check is taking longer than expected. Try again.");
+    } catch (err) {
+      setGitCanonical(null);
+      if (err instanceof MeridianApiError && err.status === 404) {
+        setGitError(
+          "The API server does not expose POST /api/v1/git/validate (HTTP 404). " +
+            "Restart the API on port 8010 from this checkout so the git-import routes load, then try again.",
+        );
+      } else {
+        setGitError(err instanceof Error ? err.message : "Could not check this repository.");
+      }
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function handleGitCreate() {
+    if (!workspaceId || !gitCanonical) return;
+    setPhase({ name: "creating" });
+    try {
+      const { project } = await createGitImport(workspaceId, {
+        name: name.trim(),
+        slug,
+        description: description.trim() || null,
+        repository_url: gitCanonical,
+        branch: gitBranch || null,
+        commit_sha: gitSha.trim() || null,
+      });
+      router.push(`/app/projects/${project.id}`);
+    } catch (err) {
+      if (err instanceof MeridianApiError && err.status === 401) {
+        router.push("/login?next=%2Fapp%2Fprojects%2Fnew");
+        return;
+      }
+      if (err instanceof MeridianApiError && err.code === "RESOURCE_CONFLICT") {
+        setFieldErrors({ slug: "This slug is taken in the selected workspace." });
+        setStep(1);
+        setPhase({ name: "form" });
+        return;
+      }
+      setPhase({
+        name: "failed",
+        message: err instanceof Error ? err.message : "Could not create the project.",
+        projectId: null,
+      });
+    }
   }
 
   function validateDetails(): boolean {
@@ -305,26 +396,118 @@ export default function NewProjectPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div role="group" aria-label="Source type" className="grid gap-2 sm:grid-cols-2">
-              <div className="flex items-center gap-3 rounded-xl border border-sage/40 bg-sage-subtle px-4 py-3.5">
-                <FileArchive aria-hidden="true" className="size-5 shrink-0 text-sage" />
-                <div>
-                  <p className="text-sm font-semibold text-ink">Upload ZIP archive</p>
-                  <p className="text-xs text-ink-2">Validated and inspected on upload</p>
-                </div>
-              </div>
-              <div
-                className="flex cursor-not-allowed items-center gap-3 rounded-xl border border-line/70 px-4 py-3.5 opacity-55"
-                title="Git connections are not built yet"
-                aria-disabled="true"
+              <button
+                type="button"
+                onClick={() => setSource("zip")}
+                aria-pressed={source === "zip"}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left",
+                  source === "zip"
+                    ? "border-sage/40 bg-sage-subtle"
+                    : "border-line/70 hover:border-line-strong",
+                )}
               >
-                <GitBranch aria-hidden="true" className="size-5 shrink-0 text-ink-3" />
-                <div>
-                  <p className="text-sm font-semibold text-ink-2">Git repository</p>
-                  <p className="text-xs text-ink-3">Not yet available</p>
-                </div>
-              </div>
+                <FileArchive aria-hidden="true" className="size-5 shrink-0 text-sage" />
+                <span>
+                  <span className="block text-sm font-semibold text-ink">Upload ZIP archive</span>
+                  <span className="block text-xs text-ink-2">Validated and inspected on upload</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource("git")}
+                aria-pressed={source === "git"}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left",
+                  source === "git"
+                    ? "border-sage/40 bg-sage-subtle"
+                    : "border-line/70 hover:border-line-strong",
+                )}
+              >
+                <GitBranch aria-hidden="true" className="size-5 shrink-0 text-sage" />
+                <span>
+                  <span className="block text-sm font-semibold text-ink">Git repository</span>
+                  <span className="block text-xs text-ink-2">Public GitHub · pinned to a commit</span>
+                </span>
+              </button>
             </div>
 
+            {source === "git" && (
+              <div className="flex flex-col gap-3">
+                <Input
+                  label="Repository URL"
+                  value={gitUrl}
+                  onChange={(event) => {
+                    setGitUrl(event.target.value);
+                    setGitCanonical(null);
+                    setGitBranches([]);
+                  }}
+                  placeholder="https://github.com/owner/repository"
+                  autoComplete="off"
+                  maxLength={2048}
+                />
+                {gitCanonical && (
+                  <p className="font-mono text-xs text-sage">GitHub · {gitCanonical}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={gitBusy}
+                    disabled={!gitUrl.trim() || !workspaceId}
+                    onClick={() => void handleGitCheck()}
+                  >
+                    Check repository
+                  </Button>
+                  {gitBusy && (
+                    <span className="text-[13px] text-ink-2">Reading branches from the worker…</span>
+                  )}
+                </div>
+                {gitBranches.length > 0 && (
+                  <>
+                    <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink">
+                      Branch
+                      <select
+                        value={gitBranch}
+                        onChange={(event) => setGitBranch(event.target.value)}
+                        className="h-10 rounded-[10px] border border-line bg-surface-1 px-3 text-[13px] font-semibold text-ink outline-none hover:border-line-strong focus:border-accent"
+                      >
+                        {gitBranches.map((branch) => (
+                          <option key={branch.name} value={branch.name}>
+                            {branch.name} · {branch.commit_sha.slice(0, 7)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Input
+                      label="Commit SHA (optional)"
+                      value={gitSha}
+                      onChange={(event) => setGitSha(event.target.value)}
+                      placeholder="Full 40-character SHA to pin exactly"
+                      autoComplete="off"
+                      maxLength={40}
+                    />
+                  </>
+                )}
+                {gitError && (
+                  <Alert tone="danger" title="That repository cannot be used">
+                    {gitError}
+                  </Alert>
+                )}
+                <p className="rounded-xl border border-line/70 bg-surface-2/60 px-4 py-3 text-[13px] leading-5 text-ink-2">
+                  Public GitHub only. The branch is pinned to a commit at import. Code is
+                  never executed, and submodules and Git LFS are rejected.
+                </p>
+                <div className="flex justify-end">
+                  <Button disabled={!gitCanonical} onClick={() => setStep(1)}>
+                    Continue <ArrowRight aria-hidden="true" className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {source === "zip" && (
+              <>
             <div
               onDragOver={(event) => {
                 event.preventDefault();
@@ -400,6 +583,8 @@ export default function NewProjectPage() {
                 Continue <ArrowRight aria-hidden="true" className="size-4" />
               </Button>
             </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -489,13 +674,24 @@ export default function NewProjectPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <dl className="rounded-xl border border-line/70">
-              {[
-                ["Project", name.trim()],
-                ["Slug", slug],
-                ["Source", "ZIP archive"],
-                ["Archive", file ? `${file.name} · ${formatBytes(file.size)}` : "—"],
-                ["Workspace", workspaces?.find((w) => w.id === workspaceId)?.name ?? "—"],
-              ].map(([label, value]) => (
+              {(source === "zip"
+                ? [
+                    ["Project", name.trim()],
+                    ["Slug", slug],
+                    ["Source", "ZIP archive"],
+                    ["Archive", file ? `${file.name} · ${formatBytes(file.size)}` : "—"],
+                    ["Workspace", workspaces?.find((w) => w.id === workspaceId)?.name ?? "—"],
+                  ]
+                : [
+                    ["Project", name.trim()],
+                    ["Slug", slug],
+                    ["Source", "Git repository (GitHub)"],
+                    ["Repository", gitCanonical ?? gitUrl],
+                    ["Branch", gitBranch || "Default branch"],
+                    ["Commit", gitSha.trim() ? gitSha.trim() : "Pinned at import"],
+                    ["Workspace", workspaces?.find((w) => w.id === workspaceId)?.name ?? "—"],
+                  ]
+              ).map(([label, value]) => (
                 <div
                   key={label}
                   className="flex items-baseline justify-between gap-6 border-b border-line/60 px-4 py-2.5 last:border-0"
@@ -544,7 +740,10 @@ export default function NewProjectPage() {
               <Button variant="secondary" disabled={busy} onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button loading={busy} onClick={() => void handleCreate()}>
+              <Button
+                loading={busy}
+                onClick={() => void (source === "git" ? handleGitCreate() : handleCreate())}
+              >
                 Create project
               </Button>
             </div>

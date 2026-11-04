@@ -26,7 +26,7 @@ from app.models import Job, JobStage, Project, User, WorkspaceMember
 
 logger = logging.getLogger("meridian.jobs")
 
-JOB_TYPES = ("lifecycle_test", "manifest_recheck", "sandbox_smoke")
+JOB_TYPES = ("lifecycle_test", "manifest_recheck", "sandbox_smoke", "git_preview", "git_import")
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
@@ -195,6 +195,45 @@ def submit_job(
     if idempotency_key is not None and not re.fullmatch(r"[A-Za-z0-9_.\-]{1,128}", idempotency_key):
         raise ApiError(422, "VALIDATION_ERROR", "The idempotency key is invalid.")
     project_id: uuid.UUID | None = None
+    if job_type in ("git_preview", "git_import"):
+        from app.services.git_url_policy import (
+            GitUrlError,
+            parse_github_url,
+            validate_branch_name,
+            validate_commit_sha,
+        )
+
+        try:
+            repo = parse_github_url(str(payload.get("repository_url", "")))
+            payload = {**payload, "repository_url": repo.canonical_url}
+            if payload.get("branch"):
+                payload["branch"] = validate_branch_name(str(payload["branch"]))
+            if payload.get("commit_sha"):
+                payload["commit_sha"] = validate_commit_sha(str(payload["commit_sha"]))
+        except GitUrlError as exc:
+            raise ApiError(422, exc.code, exc.message) from exc
+        if job_type == "git_preview":
+            payload = {"repository_url": repo.canonical_url}
+        else:
+            try:
+                project_id = uuid.UUID(str(payload.get("project_id")))
+            except (ValueError, TypeError, AttributeError):
+                raise ApiError(422, "VALIDATION_ERROR", "git_import needs a project_id.") from None
+            visible_project = (
+                session.execute(
+                    select(Project.id).where(
+                        Project.id == project_id, Project.workspace_id == workspace_id
+                    )
+                )
+            ).scalar_one_or_none()
+            if visible_project is None:
+                raise not_found("project")
+            payload = {
+                "project_id": str(project_id),
+                "repository_url": repo.canonical_url,
+                **({"branch": payload["branch"]} if payload.get("branch") else {}),
+                **({"commit_sha": payload["commit_sha"]} if payload.get("commit_sha") else {}),
+            }
     if job_type in ("manifest_recheck", "sandbox_smoke"):
         raw_snapshot = payload.get("snapshot_id")
         try:

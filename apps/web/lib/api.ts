@@ -273,6 +273,40 @@ export async function createProject(
   return data;
 }
 
+export interface GitValidation {
+  provider: string;
+  owner: string;
+  repo: string;
+  canonical_url: string;
+}
+
+export async function validateGitUrl(repositoryUrl: string): Promise<GitValidation> {
+  const { data } = await apiFetch<GitValidation>("/api/v1/git/validate", {
+    method: "POST",
+    body: JSON.stringify({ repository_url: repositoryUrl }),
+  });
+  return data;
+}
+
+export async function createGitImport(
+  workspaceId: string,
+  input: {
+    name: string;
+    slug: string;
+    description?: string | null;
+    repository_url: string;
+    branch?: string | null;
+    commit_sha?: string | null;
+    idempotency_key?: string;
+  },
+): Promise<{ project: Project; job: Job }> {
+  const { data } = await apiFetch<{ project: Project; job: Job }>(
+    `/api/v1/workspaces/${workspaceId}/git-imports`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return data;
+}
+
 export async function getProject(id: string): Promise<Project> {
   const { data } = await apiFetch<Project>(`/api/v1/projects/${id}`);
   return data;
@@ -408,7 +442,7 @@ export function uploadProjectArchive(
 export async function submitJob(
   workspaceId: string,
   input: {
-    job_type: "lifecycle_test" | "manifest_recheck";
+    job_type: "lifecycle_test" | "manifest_recheck" | "sandbox_smoke" | "git_preview" | "git_import";
     payload?: Record<string, unknown>;
     idempotency_key?: string;
   },

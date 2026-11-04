@@ -370,9 +370,7 @@ def test_build_source_image_sets_memory_cap_and_timeout() -> None:
         container_runtime.build_source_image(client, b"context-tar", "tag-x", memory_bytes=0)
     assert exc_info.value.code == "INVALID_LIMITS"
     with pytest.raises(SandboxError) as exc_info:
-        container_runtime.build_source_image(
-            client, b"context-tar", "tag-x", timeout_seconds=-1
-        )
+        container_runtime.build_source_image(client, b"context-tar", "tag-x", timeout_seconds=-1)
     assert exc_info.value.code == "INVALID_LIMITS"
 
 
