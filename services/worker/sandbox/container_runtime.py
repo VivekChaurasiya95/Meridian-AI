@@ -18,6 +18,15 @@ from .workspace import BUILD_DOCKERFILE_NAME
 
 TRUNCATION_MARKER = b"[... earlier output truncated ...]\n"
 
+# Trusted build limits (M5.3): the fixed Dockerfile has no RUN steps, so
+# builds do negligible work (COPY + metadata) — these bound the builder
+# against pathological contexts. CPU shares and CPU sets are deliberately
+# not set: shares are not a quota and pinning is platform-fragile. PID
+# and disk quotas are not expressible on builds; the 256MB context cap
+# and RUN-free Dockerfile are the operative controls there.
+BUILD_MEMORY_BYTES = 512 * 1024 * 1024
+BUILD_TIMEOUT_SECONDS = 300
+
 
 def get_client() -> Any:
     """Connect to the local container runtime (Docker Desktop here)."""
@@ -52,16 +61,26 @@ def create_container(client: Any, spec: dict) -> Any:
         ) from exc
 
 
-def build_source_image(client: Any, context_tar: bytes, tag: str) -> str:
+def build_source_image(
+    client: Any,
+    context_tar: bytes,
+    tag: str,
+    *,
+    memory_bytes: int = BUILD_MEMORY_BYTES,
+    timeout_seconds: int = BUILD_TIMEOUT_SECONDS,
+) -> str:
     """Build the per-execution source image from a build-context tarball.
 
     The build is hermetic: the context carries a fixed Dockerfile (under
     a reserved name, never the default ``Dockerfile``) with no RUN steps,
-    the base image is never pulled (it must already exist locally), and
-    the build itself has no network. Returns the built image id.
+    the base image is never pulled (it must already exist locally), the
+    build itself has no network, and builder containers get a memory cap
+    plus a client-side timeout. Returns the built image id.
     """
     if not context_tar or not tag:
         raise SandboxError("EMPTY_SOURCE", "There is no source to transfer.")
+    if memory_bytes <= 0 or timeout_seconds <= 0:
+        raise SandboxError("INVALID_LIMITS", "Build limits must be positive.")
     try:
         image, _build_logs = client.images.build(
             fileobj=io.BytesIO(context_tar),
@@ -72,6 +91,8 @@ def build_source_image(client: Any, context_tar: bytes, tag: str) -> str:
             forcerm=True,
             pull=False,
             network_mode="none",
+            container_limits={"memory": memory_bytes, "memswap": memory_bytes},
+            timeout=timeout_seconds,
             quiet=True,
         )
         return str(image.id)

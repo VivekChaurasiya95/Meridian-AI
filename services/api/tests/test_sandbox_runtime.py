@@ -213,9 +213,7 @@ def test_run_abort_cancels_execution() -> None:
         return calls["n"] >= 2
 
     with pytest.raises(SandboxError) as exc_info:
-        container_runtime.run_to_completion(
-            container, 30, poll_interval=0.001, should_abort=abort
-        )
+        container_runtime.run_to_completion(container, 30, poll_interval=0.001, should_abort=abort)
     assert exc_info.value.code == "EXECUTION_CANCELLED"
     assert container.killed
 
@@ -356,6 +354,26 @@ def test_build_source_image_pins_trusted_dockerfile_and_no_network() -> None:
     assert call["network_mode"] == "none"
     assert call["pull"] is False
     assert call["custom_context"] is True
+
+
+def test_build_source_image_sets_memory_cap_and_timeout() -> None:
+    """Builder containers get a memory cap and a client-side timeout."""
+    client = FakeClient(FakeContainer())
+    container_runtime.build_source_image(client, b"context-tar", "tag-x")
+    call = client.images.built[0]
+    assert call["container_limits"] == {
+        "memory": container_runtime.BUILD_MEMORY_BYTES,
+        "memswap": container_runtime.BUILD_MEMORY_BYTES,
+    }
+    assert call["timeout"] == container_runtime.BUILD_TIMEOUT_SECONDS
+    with pytest.raises(SandboxError) as exc_info:
+        container_runtime.build_source_image(client, b"context-tar", "tag-x", memory_bytes=0)
+    assert exc_info.value.code == "INVALID_LIMITS"
+    with pytest.raises(SandboxError) as exc_info:
+        container_runtime.build_source_image(
+            client, b"context-tar", "tag-x", timeout_seconds=-1
+        )
+    assert exc_info.value.code == "INVALID_LIMITS"
 
 
 def test_pack_build_context_enforces_size_cap(tmp_path) -> None:  # type: ignore[no-untyped-def]

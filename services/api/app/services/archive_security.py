@@ -173,9 +173,7 @@ def validate_archive(data: bytes, limits: ArchiveLimits) -> ValidationReport:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             infos = archive.infolist()
     except zipfile.BadZipFile as exc:
-        raise ArchiveRejected(
-            "ARCHIVE_NOT_ZIP", "The file is not a valid ZIP archive."
-        ) from exc
+        raise ArchiveRejected("ARCHIVE_NOT_ZIP", "The file is not a valid ZIP archive.") from exc
 
     seen: set[str] = set()
     entries: list[ValidatedEntry] = []
@@ -236,9 +234,7 @@ def is_secret_file(basename: str) -> bool:
     return lowered in SECRET_BASENAMES or lowered.endswith(SECRET_SUFFIXES)
 
 
-def extract_archive(
-    data: bytes, entries: list[ValidatedEntry], dest: str
-) -> list[ValidatedEntry]:
+def extract_archive(data: bytes, entries: list[ValidatedEntry], dest: str) -> list[ValidatedEntry]:
     """Stream validated entries to ``dest`` (an empty, private directory).
 
     Hashes while writing so no entry is ever fully buffered in memory.

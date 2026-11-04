@@ -39,6 +39,8 @@ from app.envelope import ApiError  # noqa: E402
 from app.models import RepositorySnapshot, SnapshotFile  # noqa: E402
 from app.services import jobs as job_service  # noqa: E402
 from app.services.archive_security import ValidatedEntry, compute_tree_digest  # noqa: E402
+from sandbox import container_runtime as sandbox_runtime  # noqa: E402
+from sandbox import lifecycle as sandbox_lifecycle  # noqa: E402
 from sandbox import orchestrator as sandbox_orchestrator  # noqa: E402
 from sandbox.exceptions import SandboxError  # noqa: E402
 
@@ -230,6 +232,29 @@ def process_job(job: dict, worker_id: str, lease_seconds: int, heartbeat_seconds
         heartbeat.join(timeout=heartbeat_seconds)
 
 
+def _recover_orphans_at_startup() -> None:
+    """Destroy containers abandoned by earlier crashed workers.
+
+    Best-effort: recovery must never prevent the worker from starting
+    (a daemon outage still allows non-sandbox jobs), so every failure
+    is a loud warning, never fatal.
+    """
+    try:
+        client = sandbox_runtime.get_client()
+    except SandboxError as exc:
+        logger.warning("startup orphan recovery skipped code=%s", exc.code)
+        return
+    try:
+        outcome = sandbox_lifecycle.recover_orphans(get_session_factory(), client)
+    except SandboxError as exc:
+        logger.warning("startup orphan recovery failed code=%s", exc.code)
+        return
+    logger.info(
+        "startup orphan recovery pruned=%d kept=%d failed=%d",
+        outcome["pruned"], outcome["kept"], outcome["failed"],
+    )
+
+
 def main() -> None:
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
@@ -245,6 +270,7 @@ def main() -> None:
     # Fail fast when the database is unreachable (compose depends_on covers it).
     with session_scope() as session:
         job_service.claim_job(session, worker_id, SAFE_JOB_TYPES, lease_seconds)
+    _recover_orphans_at_startup()
     while not _stop:
         claimed: dict | None = None
         with session_scope() as session:

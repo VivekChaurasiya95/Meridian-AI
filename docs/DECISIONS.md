@@ -299,3 +299,45 @@ contracts > Database spec > Design system > Implementation plan > existing code.
   nested in subdirectories are data. Image builds also run with
   `network_mode="none"`, since the fixed file has no RUN steps and
   `pull=False`.
+
+## Milestone 5.3 decisions
+
+- **D55 — Startup orphan recovery.** The worker calls
+  `recover_orphans` once at startup: managed-labeled containers whose
+  executions are not live per PostgreSQL (lease, owner, attempt) are
+  destroyed; liveness failures fail closed toward keeping; pruned rows
+  get `cleanup_status` marked while `status` stays historical truth;
+  unlabeled containers are never listed. Recovery never blocks worker
+  start (loud warning instead). No periodic reaper: orphans arise only
+  from crashes, so startup recovery is sufficient.
+- **D56 — Workspace running cap.** `claim_job` skips workspaces holding
+  `sandbox_max_running_jobs_per_workspace` live running jobs (default
+  10; expired leases excluded as reclaimable). Enforced claim-side in
+  one atomic statement for fairness across workspaces; payloads can
+  never override it. Per-worker concurrency stays architectural 1
+  (serial claim loop), documented rather than configured.
+- **D57 — Build memory cap and timeout.** Source-image builds pass
+  `container_limits` (512MB, no swap) and a 300s client timeout.
+  Empirically verified on the dev daemon: a 4MB cap is rejected with
+  the minimum error and a 100MB alloc under 32MB OOMs (137). CPU
+  shares/sets are deliberately unset (not a quota / platform-fragile);
+  PID and disk quotas are not build-expressible — the RUN-free fixed
+  Dockerfile and 256MB context cap remain the operative controls.
+- **D58 — Seccomp: retain the daemon default (evaluated, not deployed
+  custom).** A custom profile path must live inside the Docker Desktop
+  VM, unshippable from this repo; the default profile already
+  constrains non-root, capability-free, network-less containers, and
+  smoke compatibility is proven by the daemon suite. A lock-in test
+  forbids `unconfined` or any untested custom profile; shipping one
+  requires allowlist-compatibility tests first.
+- **D59 — Credential documentation correction (D53/HANDOFF).** D53's
+  "worker receives no storage credentials" and HANDOFF's "S3 creds
+  stripped from worker env" are superseded: by design the worker holds
+  read-only repository credentials, the API holds read-write
+  repository credentials, and execution containers hold none. A
+  restricted `meridian-api` MinIO identity (repos ListBucket +
+  Get/Put/DeleteObject, nothing else) is provisioned and verified but
+  NOT activated: its secret lives only in gitignored `.env`, and the
+  API still runs on root credentials until its cutover is separately
+  approved. Worker-secret and root rotations are pending, in that
+  order, root last.

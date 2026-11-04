@@ -121,9 +121,7 @@ class FakeContainers:
         known = list(self.available) + list(self.created)
         wanted = (filters or {}).get("label", "")
         key, _, value = wanted.partition("=")
-        return [
-            c for c in known if c.labels.get(key) == value
-        ] if key else known
+        return [c for c in known if c.labels.get(key) == value] if key else known
 
 
 class FakeImage:
@@ -272,9 +270,7 @@ def test_smoke_flow_completes_with_fake_daemon(
     assert ("sandbox_prepare", "completed") in stages
     assert ("sandbox_execute", "completed") in stages
 
-    done = job_service.complete_job(
-        db_session, uuid.UUID(claimed["id"]), "w-orch", summary
-    )
+    done = job_service.complete_job(db_session, uuid.UUID(claimed["id"]), "w-orch", summary)
     assert done["status"] == "completed"
 
 
@@ -312,8 +308,12 @@ def test_smoke_timeout_kills_and_marks(
     client = FakeClient([FakeContainer(exit_after=10**9)])
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, claimed, "w-to", client=client,
-            store=fake_store, timeout_seconds=1,
+            db_session_factory,
+            claimed,
+            "w-to",
+            client=client,
+            store=fake_store,
+            timeout_seconds=1,
         )
     assert exc_info.value.code == "COMMAND_TIMEOUT"
     row = _execution_row(db_session_factory, claimed["id"])
@@ -339,8 +339,12 @@ def test_cancel_aborts_execution(
 
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, claimed, "w-cx", client=FakeClient([container]),
-            store=fake_store, is_cancelled=abort,
+            db_session_factory,
+            claimed,
+            "w-cx",
+            client=FakeClient([container]),
+            store=fake_store,
+            is_cancelled=abort,
         )
     assert exc_info.value.code == "EXECUTION_CANCELLED"
     assert container.killed is True
@@ -363,8 +367,11 @@ def test_missing_snapshot_rejected_before_container(
     containers = FakeContainers([])
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, job, "w-ghost",
-            client=FakeClient(containers), store=fake_store,
+            db_session_factory,
+            job,
+            "w-ghost",
+            client=FakeClient(containers),
+            store=fake_store,
         )
     assert exc_info.value.code == "RESOURCE_NOT_FOUND"
     assert exc_info.value.retryable is False
@@ -387,8 +394,11 @@ def test_cross_workspace_snapshot_rejected(
     containers = FakeContainers([])
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, job, "w-x",
-            client=FakeClient(containers), store=fake_store,
+            db_session_factory,
+            job,
+            "w-x",
+            client=FakeClient(containers),
+            store=fake_store,
         )
     assert exc_info.value.code == "RESOURCE_NOT_FOUND"
     assert containers.created == []
@@ -405,8 +415,11 @@ def test_unknown_profile_rejected_without_row(
     containers = FakeContainers([])
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, job, "w-u",
-            client=FakeClient(containers), store=fake_store,
+            db_session_factory,
+            job,
+            "w-u",
+            client=FakeClient(containers),
+            store=fake_store,
         )
     assert exc_info.value.code == "UNKNOWN_PROFILE"
     assert containers.created == []
@@ -414,9 +427,7 @@ def test_unknown_profile_rejected_without_row(
     try:
         count = (
             session.execute(
-                select(SandboxExecution).where(
-                    SandboxExecution.job_id == uuid.UUID(job["id"])
-                )
+                select(SandboxExecution).where(SandboxExecution.job_id == uuid.UUID(job["id"]))
             )
         ).all()
     finally:
@@ -434,21 +445,30 @@ def test_retry_new_attempt_new_row_duplicate_refused(
     claimed = job_service.claim_job(db_session, "w-rt", ("sandbox_smoke",), 60)
     assert claimed is not None
     first = orchestrator.execute_job(
-        db_session_factory, claimed, "w-rt",
-        client=FakeClient([FakeContainer()]), store=fake_store,
+        db_session_factory,
+        claimed,
+        "w-rt",
+        client=FakeClient([FakeContainer()]),
+        store=fake_store,
     )
     assert first["exit_code"] == 0
     claimed["attempts"] = 2
     second = orchestrator.execute_job(
-        db_session_factory, claimed, "w-rt",
-        client=FakeClient([FakeContainer()]), store=fake_store,
+        db_session_factory,
+        claimed,
+        "w-rt",
+        client=FakeClient([FakeContainer()]),
+        store=fake_store,
     )
     assert second["exit_code"] == 0
     claimed["attempts"] = 1
     with pytest.raises(SandboxError) as exc_info:
         orchestrator.execute_job(
-            db_session_factory, claimed, "w-rt",
-            client=FakeClient([FakeContainer()]), store=fake_store,
+            db_session_factory,
+            claimed,
+            "w-rt",
+            client=FakeClient([FakeContainer()]),
+            store=fake_store,
         )
     assert exc_info.value.code == "DUPLICATE_EXECUTION"
 
@@ -468,18 +488,29 @@ def test_prune_removes_stale_containers(
     session = db_session_factory()
     try:
         lifecycle.create_execution(
-            session, execution_id=uuid.UUID(hex=live_id), job_id=job_id,
-            worker_id="w-pr", snapshot_id=uuid.UUID(snapshot["id"]),
-            profile="sandbox_smoke", attempt=claimed["attempts"],
+            session,
+            execution_id=uuid.UUID(hex=live_id),
+            job_id=job_id,
+            worker_id="w-pr",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"],
         )
         lifecycle.create_execution(
-            session, execution_id=uuid.UUID(hex=stale_id), job_id=job_id,
-            worker_id="w-pr", snapshot_id=uuid.UUID(snapshot["id"]),
-            profile="sandbox_smoke", attempt=claimed["attempts"] + 1,
+            session,
+            execution_id=uuid.UUID(hex=stale_id),
+            job_id=job_id,
+            worker_id="w-pr",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"] + 1,
         )
         lifecycle.finish_execution(
-            session, uuid.UUID(hex=stale_id), status="failed",
-            error_code="COMMAND_FAILED", error_message="boom",
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
         )
     finally:
         session.close()
@@ -497,16 +528,17 @@ def test_prune_removes_stale_containers(
             check.close()
 
     result = lifecycle.prune_stale_containers(client, is_live)
-    assert result == {"pruned": 2, "kept": 1, "failed": 0}
+    assert result == {
+        "pruned": 2, "kept": 1, "failed": 0,
+        "pruned_ids": sorted([stale_id, "b" * 32]),
+    }
     assert live.removed is False
     assert stale.removed is True
     assert ghost.removed is True
     assert plain.removed is False
 
 
-def test_is_running_and_owned(
-    auth_client: TestClient, db_session: Session
-) -> None:
+def test_is_running_and_owned(auth_client: TestClient, db_session: Session) -> None:
     workspace = make_workspace(auth_client, "wsown")
     project = make_project(auth_client, workspace["id"], "own")
     snapshot = upload_snapshot(auth_client, project["id"], make_zip(ORIGINAL))
@@ -527,3 +559,189 @@ def test_is_running_and_owned(
     done = job_service.complete_job(db_session, job_id, "w-own", {"ok": True})
     assert done["status"] == "completed"
     assert job_service.is_running_and_owned(db_session, job_id, "w-own") is False
+
+
+def _live_execution(db_session_factory, job_id, worker, snapshot_id, attempt):  # type: ignore[no-untyped-def]
+    execution_id = uuid.uuid4().hex
+    session = db_session_factory()
+    try:
+        lifecycle.create_execution(
+            session, execution_id=uuid.UUID(hex=execution_id), job_id=uuid.UUID(job_id),
+            worker_id=worker, snapshot_id=uuid.UUID(snapshot_id),
+            profile="sandbox_smoke", attempt=attempt,
+        )
+    finally:
+        session.close()
+    return execution_id
+
+
+def _managed_container(execution_id: str) -> FakeContainer:
+    return FakeContainer(
+        labels={"meridian.managed": "true", "meridian.execution_id": execution_id}
+    )
+
+
+def _cleanup_status(db_session_factory, execution_id: str):  # type: ignore[no-untyped-def]
+    session = db_session_factory()
+    try:
+        row = session.get(SandboxExecution, uuid.UUID(hex=execution_id))
+        return row.cleanup_status if row is not None else None
+    finally:
+        session.close()
+
+
+def test_recovery_keeps_live_prunes_stale_and_marks_rows(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, snapshot, _job = _setup_job(auth_client, "rc")
+    claimed = job_service.claim_job(db_session, "w-rc", ("sandbox_smoke",), 60)
+    assert claimed is not None
+    live_id = _live_execution(
+        db_session_factory, claimed["id"], "w-rc", snapshot["id"], claimed["attempts"]
+    )
+    stale_id = _live_execution(
+        db_session_factory, claimed["id"], "w-rc", snapshot["id"], claimed["attempts"] + 1
+    )
+    session = db_session_factory()
+    try:
+        lifecycle.finish_execution(
+            session, uuid.UUID(hex=stale_id), status="failed",
+            error_code="COMMAND_FAILED", error_message="boom",
+        )
+    finally:
+        session.close()
+    live = _managed_container(live_id)
+    stale = _managed_container(stale_id)
+    ghost = _managed_container("c" * 32)
+    client = FakeClient(FakeContainers([live, stale, ghost]))
+
+    result = lifecycle.recover_orphans(db_session_factory, client)
+
+    assert result["pruned"] == 2
+    assert result["kept"] == 1
+    assert result["failed"] == 0
+    assert result["pruned_ids"] == sorted([stale_id, "c" * 32])
+    assert live.removed is False
+    assert stale.removed is True
+    assert ghost.removed is True
+    assert _cleanup_status(db_session_factory, live_id) == "pending"
+    assert _cleanup_status(db_session_factory, stale_id) == "cleaned"
+
+
+def test_recovery_reclaimed_job_is_stale(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, snapshot, _job = _setup_job(auth_client, "rk")
+    claimed = job_service.claim_job(db_session, "w-a", ("sandbox_smoke",), 60)
+    assert claimed is not None
+    old_id = _live_execution(
+        db_session_factory, claimed["id"], "w-a", snapshot["id"], claimed["attempts"]
+    )
+    db_session.execute(
+        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute'"
+             " WHERE id = :id"),
+        {"id": claimed["id"]},
+    )
+    db_session.commit()
+    reclaimed = job_service.claim_job(db_session, "w-b", ("sandbox_smoke",), 60)
+    assert reclaimed is not None and reclaimed["worker_id"] == "w-b"
+    container = _managed_container(old_id)
+
+    result = lifecycle.recover_orphans(
+        db_session_factory, FakeClient(FakeContainers([container]))
+    )
+
+    assert result["pruned"] == 1
+    assert container.removed is True
+    assert _cleanup_status(db_session_factory, old_id) == "cleaned"
+
+
+def test_recovery_prunes_rowless_malformed_keeps_unlabeled(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, _s, _job = _setup_job(auth_client, "rm")
+    ghost = _managed_container("d" * 32)
+    malformed = _managed_container("!!!not-hex!!!")
+    plain = FakeContainer(labels={})
+    client = FakeClient(FakeContainers([ghost, malformed, plain]))
+
+    result = lifecycle.recover_orphans(db_session_factory, client)
+
+    assert result["pruned"] == 2
+    assert result["pruned_ids"] == sorted(["d" * 32, "!!!not-hex!!!"])
+    assert ghost.removed is True
+    assert malformed.removed is True
+    assert plain.removed is False
+
+
+def test_recovery_idempotent(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, snapshot, _job = _setup_job(auth_client, "ri")
+    claimed = job_service.claim_job(db_session, "w-ri", ("sandbox_smoke",), 60)
+    assert claimed is not None
+    stale_id = _live_execution(
+        db_session_factory, claimed["id"], "w-ri", snapshot["id"], claimed["attempts"]
+    )
+    session = db_session_factory()
+    try:
+        lifecycle.finish_execution(
+            session, uuid.UUID(hex=stale_id), status="failed",
+            error_code="COMMAND_FAILED", error_message="boom",
+        )
+    finally:
+        session.close()
+    containers = FakeContainers([_managed_container(stale_id)])
+    client = FakeClient(containers)
+    first = lifecycle.recover_orphans(db_session_factory, client)
+    assert first["pruned"] == 1
+    # Model daemon truth: destroyed containers vanish from later listings.
+    containers.available = [c for c in containers.available if not c.removed]
+    second = lifecycle.recover_orphans(db_session_factory, client)
+    assert second == {"pruned": 0, "kept": 0, "failed": 0, "pruned_ids": []}
+
+
+def test_recovery_db_outage_keeps_containers(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, snapshot, _job = _setup_job(auth_client, "ro")
+    claimed = job_service.claim_job(db_session, "w-ro", ("sandbox_smoke",), 60)
+    assert claimed is not None
+    stale_id = _live_execution(
+        db_session_factory, claimed["id"], "w-ro", snapshot["id"], claimed["attempts"]
+    )
+    session = db_session_factory()
+    try:
+        lifecycle.finish_execution(
+            session, uuid.UUID(hex=stale_id), status="failed",
+            error_code="COMMAND_FAILED", error_message="boom",
+        )
+    finally:
+        session.close()
+    container = _managed_container(stale_id)
+
+    def broken_factory():  # type: ignore[no-untyped-def]
+        raise RuntimeError("database unreachable")
+
+    result = lifecycle.recover_orphans(
+        broken_factory, FakeClient(FakeContainers([container]))
+    )
+
+    assert result["pruned"] == 0
+    assert result["kept"] == 1
+    assert container.removed is False

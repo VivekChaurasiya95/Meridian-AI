@@ -162,6 +162,7 @@ def prune_stale_containers(
     pruned = 0
     kept = 0
     failed = 0
+    pruned_ids: list[str] = []
     for container in containers:
         try:
             labels = getattr(container, "labels", None) or {}
@@ -172,9 +173,54 @@ def prune_stale_containers(
             status = destroy_container(container)
             if status == "cleaned":
                 pruned += 1
+                if execution_id:
+                    pruned_ids.append(execution_id)
             else:
                 failed += 1
         except Exception:
             failed += 1
     logger.info("orphan prune pruned=%d kept=%d failed=%d", pruned, kept, failed)
-    return {"pruned": pruned, "kept": kept, "failed": failed}
+    return {"pruned": pruned, "kept": kept, "failed": failed, "pruned_ids": sorted(pruned_ids)}
+
+
+def recover_orphans(session_factory: Any, client: Any) -> dict:
+    """Worker-startup recovery: destroy managed containers with no live execution.
+
+    Liveness is re-checked against PostgreSQL per container
+    (``is_execution_live``): a healthy worker's lease keeps its container,
+    so recovery never races a live execution — and staleness is monotonic
+    (an expired, finished, or reclaimed execution can never become live
+    again), so a prune verdict cannot flip back. Containers without a
+    parsable execution row are pruned loudly: rows are created before
+    containers, so a managed container with no row is corrupt or foreign
+    to this database. Unlabeled containers are never listed, let alone
+    touched. Pruned rows get ``cleanup_status`` marked (their execution
+    ``status`` is historical truth and stays untouched). Idempotent.
+    """
+    def is_live(execution_id_hex: str) -> bool:
+        try:
+            execution_uuid = uuid.UUID(hex=execution_id_hex)
+        except ValueError:
+            logger.warning("orphan with malformed execution id; pruning")
+            return False
+        try:
+            with session_factory() as session:
+                return is_execution_live(session, execution_uuid)
+        except Exception as exc:
+            # Fail closed toward keeping: a database outage must never
+            # look like a dead execution.
+            logger.warning("liveness check failed; keeping container error=%s", exc)
+            return True
+
+    result = prune_stale_containers(client, is_live)
+    for execution_id_hex in result["pruned_ids"]:
+        try:
+            with session_factory() as session:
+                update_cleanup(session, uuid.UUID(hex=execution_id_hex), "cleaned")
+        except ValueError:
+            continue
+    logger.info(
+        "orphan recovery pruned=%d kept=%d failed=%d",
+        result["pruned"], result["kept"], result["failed"],
+    )
+    return result

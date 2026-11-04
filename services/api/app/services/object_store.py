@@ -50,9 +50,7 @@ class MinioObjectStore:
     """boto3-backed store. Buckets stay private: nothing here creates
     policies, signed URLs, or public access."""
 
-    def __init__(
-        self, endpoint_url: str, access_key: str, secret_key: str, region: str
-    ) -> None:
+    def __init__(self, endpoint_url: str, access_key: str, secret_key: str, region: str) -> None:
         import boto3
         from botocore.config import Config
 
@@ -89,9 +87,7 @@ class MinioObjectStore:
     def put_file(self, bucket: str, key: str, path: str) -> int:
         try:
             self.ensure_bucket(bucket)
-            self._client.upload_file(
-                path, bucket, key, ExtraArgs={"ContentType": TAR_MIME}
-            )
+            self._client.upload_file(path, bucket, key, ExtraArgs={"ContentType": TAR_MIME})
             head = self._client.head_object(Bucket=bucket, Key=key)
             return int(head.get("ContentLength", 0))
         except StorageError:
@@ -253,9 +249,7 @@ def build_snapshot_tar(indexed: list[tuple[str, str]], source_dir: str, tar_path
             full = os.path.join(source_dir, *rel_path.split("/"))
             info = tar.gettarinfo(full, arcname=rel_path)
             if info is None or not info.isfile():
-                raise StorageError(
-                    "TAR_BUILD_FAILED", f"Indexed file is missing: {rel_path}"
-                )
+                raise StorageError("TAR_BUILD_FAILED", f"Indexed file is missing: {rel_path}")
             info.mtime = 0
             info.uid = 0
             info.gid = 0

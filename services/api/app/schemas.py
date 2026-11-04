@@ -94,4 +94,3 @@ class JobSubmit(StrictModel):
     )
     priority: int = Field(default=0, ge=0, le=1000)
     max_attempts: int | None = Field(default=None, ge=1, le=25)
-

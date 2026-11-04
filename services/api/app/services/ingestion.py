@@ -359,4 +359,3 @@ def upload_source(
             "manifest": manifest,
         },
     }
-

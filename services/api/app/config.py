@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     job_retry_base_seconds: int = Field(default=30, ge=1, le=3600)
     job_retry_max_seconds: int = Field(default=3600, ge=60, le=86400)
 
+    # Sandbox quotas (M5.3). Trusted operator configuration: API payloads
+    # can never override these. Running jobs with expired leases do not
+    # count (they are reclaimable, not live).
+    sandbox_max_running_jobs_per_workspace: int = Field(default=10, ge=1, le=1000)
+
     # Immutable snapshot content storage (M5.1, private MinIO bucket).
     # NOTE for local runs: the host-mapped MinIO API port is 9010, so a
     # local .env needs S3_ENDPOINT_URL=http://localhost:9010 (the

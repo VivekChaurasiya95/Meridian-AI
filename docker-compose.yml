@@ -50,10 +50,14 @@ services:
       mc mb local/meridian-repositories --ignore-existing;
       mc admin user add local meridian-worker meridian-worker-secret 2>/dev/null || true;
       mc admin user info local meridian-worker;
-      printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::meridian-repositories","arn:aws:s3:::meridian-repositories/*"]}]}' > /tmp/sandbox-repositories-read.json;
-      mc admin policy create local sandbox-repositories-read /tmp/sandbox-repositories-read.json;
+      printf '%s' '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::meridian-repositories\",\"arn:aws:s3:::meridian-repositories/*\"]}]}' > /tmp/sandbox-repositories-read.json;
+      mc admin policy create local sandbox-repositories-read /tmp/sandbox-repositories-read.json || true;
       mc admin policy info local sandbox-repositories-read;
       mc admin policy attach local sandbox-repositories-read --user meridian-worker;
+      if mc admin user info local meridian-api >/dev/null 2>&1; then echo meridian-api user already exists, leaving credentials untouched; else mc admin user add local meridian-api "${MERIDIAN_API_SECRET:?MERIDIAN_API_SECRET_is_required}"; mc admin user info local meridian-api; fi;
+      printf '%s' '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::meridian-repositories\"]},{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\"],\"Resource\":[\"arn:aws:s3:::meridian-repositories/*\"]}]}' > /tmp/api-repositories-rw.json;
+      mc admin policy create local api-repositories-rw /tmp/api-repositories-rw.json || mc admin policy info local api-repositories-rw;
+      mc admin policy attach local api-repositories-rw --user meridian-api;
       exit 0;
       "
 

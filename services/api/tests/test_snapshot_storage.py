@@ -443,9 +443,7 @@ def test_materialize_rejects_corrupt_tar(
     fake_store: FakeObjectStore,
     tmp_path,  # type: ignore[no-untyped-def]
 ) -> None:
-    _rejects(
-        auth_client, db_session_factory, fake_store, tmp_path, b"\x00not-a-tar\xff"
-    )
+    _rejects(auth_client, db_session_factory, fake_store, tmp_path, b"\x00not-a-tar\xff")
 
 
 def test_materialize_enforces_file_count_cap(
@@ -509,3 +507,59 @@ def test_list_orphan_keys_detects_unreferenced(
     assert result["objects"] == 2
     assert result["orphan_keys"] == [stray]
     assert result["orphan_bytes"] == len(b"leftover")
+
+
+def _failing_real_store():  # type: ignore[no-untyped-def]
+    """Real client, refused endpoint, marker credentials (never valid)."""
+    pytest.importorskip("boto3", reason="boto3 is not installed; MinIO needs it.")
+    from app.services.object_store import MinioObjectStore
+
+    return MinioObjectStore(
+        endpoint_url="http://127.0.0.1:9",
+        access_key="AK-TEST-SECRET-XYZ",
+        secret_key="SK-TEST-SECRET-XYZ",
+        region="us-east-1",
+    )
+
+
+def test_storage_errors_never_carry_credentials(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Every store method fails with fixed messages, never key material."""
+    # Single attempt: the assertions cover message content, not retries.
+    monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
+    store = _failing_real_store()
+    calls = [
+        lambda: store.ensure_bucket("nope"),
+        lambda: store.put_file("nope", "k", __file__),
+        lambda: store.get_bytes("nope", "k"),
+        lambda: store.download_file("nope", "k", str(tmp_path / "x")),
+        lambda: store.object_exists("nope", "k"),
+        lambda: store.delete_object("nope", "k"),
+        lambda: store.list_objects("nope", "p/"),
+    ]
+    for call in calls:
+        with pytest.raises(StorageError) as exc_info:
+            call()
+        blob = f"{exc_info.value.code} {exc_info.value.message}"
+        assert "SECRET-XYZ" not in blob
+
+
+def test_service_errors_never_carry_credentials(
+    auth_client: TestClient,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Service envelopes map store failures to fixed codes, never secrets."""
+    monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
+    workspace = make_workspace(auth_client, "wsred")
+    project = make_project(auth_client, workspace["id"], "red")
+    upload_snapshot(auth_client, project["id"], make_zip(ORIGINAL))
+    session, _user = _open_session(db_session_factory)
+    try:
+        with pytest.raises(ApiError) as exc_info:
+            storage_service.list_orphan_keys(session, store=_failing_real_store())
+    finally:
+        session.close()
+    assert exc_info.value.status_code == 503
+    blob = f"{exc_info.value.code} {exc_info.value.message}"
+    assert "SECRET-XYZ" not in blob

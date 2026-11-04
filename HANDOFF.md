@@ -70,7 +70,7 @@ shutdown) running only `lifecycle_test` and `manifest_recheck`;
 endpoints submit/list/get/cancel/stages (worker transitions are
 service-layer, no worker credentials); Jobs page with 5s polling,
 stage timelines, cancel, "Run test job"; per-user upload rate limiting;
-S3 creds stripped from worker env; `/health/ready` probes the real
+worker S3 access is read-only repository scope (M5.2; was fully stripped in M4); `/health/ready` probes the real
 jobs table. Proven live: a UI-submitted job went queued → running →
 completed with stages on the first attempt.
 

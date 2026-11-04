@@ -219,9 +219,7 @@ class RepositorySnapshot(Base):
     manifest: Mapped[dict] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
-    storage_status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default="pending"
-    )
+    storage_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
     storage_key: Mapped[str | None] = mapped_column(Text)
     storage_bytes: Mapped[int | None] = mapped_column(BigInteger)
     storage_verified_at: Mapped[dt.datetime | None] = mapped_column()
@@ -243,9 +241,7 @@ class SnapshotFile(Base):
     """
 
     __tablename__ = "snapshot_files"
-    __table_args__ = (
-        Index("idx_snapshot_files_snapshot", "snapshot_id", "path"),
-    )
+    __table_args__ = (Index("idx_snapshot_files_snapshot", "snapshot_id", "path"),)
 
     snapshot_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("repository_snapshots.id", ondelete="CASCADE"), primary_key=True
@@ -394,9 +390,7 @@ class SandboxExecution(Base):
     )
     error_code: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
-    cleanup_status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default="pending"
-    )
+    cleanup_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     created_at: Mapped[dt.datetime] = mapped_column(nullable=False, server_default=text("now()"))
     completed_at: Mapped[dt.datetime | None] = mapped_column()

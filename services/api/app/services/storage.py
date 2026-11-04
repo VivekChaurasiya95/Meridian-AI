@@ -142,9 +142,7 @@ def verify_snapshot(
     snapshot, tmp_path, _expected = download_snapshot_object(session, user, snapshot_id, store)
     workdir = os.path.dirname(tmp_path)
     try:
-        snapshot.storage_verified_at = session.execute(
-            select(func.now())
-        ).scalar_one()
+        snapshot.storage_verified_at = session.execute(select(func.now())).scalar_one()
         session.commit()
         session.refresh(snapshot)
         logger.info("snapshot verified snapshot_id=%s", snapshot.id)
@@ -245,7 +243,9 @@ def _materialize_extracted(
                 members = probe.getmembers()
         except (tarfile.TarError, EOFError, OSError):
             _mark_integrity_failed(
-                session, snapshot, "TARBALL_CORRUPT",
+                session,
+                snapshot,
+                "TARBALL_CORRUPT",
                 "The stored object is not a valid archive.",
             )
             raise ApiError(
@@ -300,11 +300,9 @@ def _materialize_extracted(
         for path, actual in seen.items():
             if actual != expected_hashes[path]:
                 raise ApiError(422, "INTEGRITY_FAILED", f"Hash mismatch for file: {path}")
-        authoritative = (
-            session.execute(
-                select(SnapshotFile).where(SnapshotFile.snapshot_id == snapshot.id)
-            ).scalars()
-        )
+        authoritative = session.execute(
+            select(SnapshotFile).where(SnapshotFile.snapshot_id == snapshot.id)
+        ).scalars()
         recomputed = compute_tree_digest(
             [
                 ValidatedEntry(path=row.path, size=row.size, sha256=row.sha256)
@@ -343,17 +341,13 @@ def delete_snapshot_content(session: Session, snapshot: RepositorySnapshot) -> N
         )
     ).scalar_one()
     if remaining > 0:
-        logger.info(
-            "snapshot object shared snapshot_id=%s references=%d", snapshot.id, remaining
-        )
+        logger.info("snapshot object shared snapshot_id=%s references=%d", snapshot.id, remaining)
         return
     try:
         get_store().delete_object(get_settings().s3_repositories_bucket, snapshot.storage_key)
         logger.info("snapshot object deleted snapshot_id=%s", snapshot.id)
     except StorageError as exc:
-        logger.warning(
-            "snapshot object orphaned snapshot_id=%s code=%s", snapshot.id, exc.code
-        )
+        logger.warning("snapshot object orphaned snapshot_id=%s code=%s", snapshot.id, exc.code)
 
 
 def list_orphan_keys(session: Session, store: ObjectStore | None = None) -> dict:
@@ -383,7 +377,9 @@ def list_orphan_keys(session: Session, store: ObjectStore | None = None) -> dict
     orphan_bytes = sum(size for key, size in listed if key not in referenced)
     logger.info(
         "orphan scan objects=%d orphans=%d orphan_bytes=%d",
-        len(listed), len(orphans), orphan_bytes,
+        len(listed),
+        len(orphans),
+        orphan_bytes,
     )
     return {
         "objects": len(listed),

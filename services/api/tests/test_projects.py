@@ -168,9 +168,7 @@ def test_list_projects_filters_search_sort(auth_client: TestClient) -> None:
     ).json()
     assert [p["slug"] for p in second["data"]] == ["old"]
 
-    bad = auth_client.get(
-        f"/api/v1/workspaces/{workspace['id']}/projects", params={"sort": "nope"}
-    )
+    bad = auth_client.get(f"/api/v1/workspaces/{workspace['id']}/projects", params={"sort": "nope"})
     assert bad.status_code == 422
 
 
@@ -223,9 +221,7 @@ def test_unarchive_restores_project(auth_client: TestClient) -> None:
 
 def test_projects_summary_counts_are_real(auth_client: TestClient) -> None:
     workspace = make_workspace(auth_client, "wssum")
-    empty = auth_client.get(
-        f"/api/v1/workspaces/{workspace['id']}/projects/summary"
-    ).json()["data"]
+    empty = auth_client.get(f"/api/v1/workspaces/{workspace['id']}/projects/summary").json()["data"]
     assert empty == {
         "total": 0,
         "active": 0,
@@ -238,9 +234,9 @@ def test_projects_summary_counts_are_real(auth_client: TestClient) -> None:
     second = make_project(auth_client, workspace["id"], "two")
     auth_client.post(f"/api/v1/projects/{second['id']}/archive")
     assert upload(auth_client, first["id"], "app.zip", DEMO_ZIP).status_code == 201
-    summary = auth_client.get(
-        f"/api/v1/workspaces/{workspace['id']}/projects/summary"
-    ).json()["data"]
+    summary = auth_client.get(f"/api/v1/workspaces/{workspace['id']}/projects/summary").json()[
+        "data"
+    ]
     assert summary["total"] == 2
     assert summary["active"] == 1
     assert summary["archived"] == 1

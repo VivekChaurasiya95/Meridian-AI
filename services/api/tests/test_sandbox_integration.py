@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "services" / "worker"))
 
-from sandbox import container_runtime, lifecycle, orchestrator
+from sandbox import container_runtime, lifecycle, orchestrator, workspace
 from sandbox.container_spec import build_spec
 from sandbox.exceptions import SandboxError
 from sandbox.execution_policy import get_policy
@@ -161,9 +161,7 @@ def test_daemon_smoke_end_to_end(
     with pytest.raises(docker.errors.ImageNotFound):
         docker_client.images.get(summary["image_tag"])
 
-    done = job_service.complete_job(
-        db_session, uuid.UUID(claimed["id"]), "w-it", summary
-    )
+    done = job_service.complete_job(db_session, uuid.UUID(claimed["id"]), "w-it", summary)
     assert done["status"] == "completed"
 
 
@@ -184,9 +182,7 @@ def test_daemon_ignores_repo_dockerfile(
     assert "meridian-sandbox-ok" in summary["stdout_excerpt"]
     assert summary["files"] == len(HOSTILE_DOCKERFILE)
     assert summary["image_removed"] is True
-    done = job_service.complete_job(
-        db_session, uuid.UUID(claimed["id"]), "w-hd", summary
-    )
+    done = job_service.complete_job(db_session, uuid.UUID(claimed["id"]), "w-hd", summary)
     assert done["status"] == "completed"
 
 
@@ -290,9 +286,7 @@ def test_daemon_prune_removes_stale(
         live.start()
         stale_eid = stale.labels["meridian.execution_id"]
         live_eid = live.labels["meridian.execution_id"]
-        result = lifecycle.prune_stale_containers(
-            docker_client, lambda eid: eid == live_eid
-        )
+        result = lifecycle.prune_stale_containers(docker_client, lambda eid: eid == live_eid)
         assert result["kept"] == 1
         assert result["failed"] == 0
         assert result["pruned"] >= 1
@@ -302,3 +296,97 @@ def test_daemon_prune_removes_stale(
     finally:
         container_runtime.destroy_container(stale)
         container_runtime.destroy_container(live)
+
+
+def test_daemon_recovery_prunes_stale_keeps_live(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+    docker_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """Restart recovery against the real daemon: a finished execution's
+    container is destroyed, a live lease's container is untouched, and
+    the pruned row is marked cleaned."""
+    snapshot, _job = _setup_job(auth_client, "rc")
+    claimed = job_service.claim_job(db_session, "w-rc", ("sandbox_smoke",), 120)
+    assert claimed is not None
+    job_id = uuid.UUID(claimed["id"])
+    live_id = uuid.uuid4().hex
+    stale_id = uuid.uuid4().hex
+    session = db_session_factory()
+    try:
+        lifecycle.create_execution(
+            session, execution_id=uuid.UUID(hex=live_id), job_id=job_id,
+            worker_id="w-rc", snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke", attempt=claimed["attempts"],
+        )
+        lifecycle.create_execution(
+            session, execution_id=uuid.UUID(hex=stale_id), job_id=job_id,
+            worker_id="w-rc", snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke", attempt=claimed["attempts"] + 1,
+        )
+        lifecycle.finish_execution(
+            session, uuid.UUID(hex=stale_id), status="failed",
+            error_code="COMMAND_FAILED", error_message="boom",
+        )
+    finally:
+        session.close()
+    policy = get_policy("sandbox_smoke")
+    live = container_runtime.create_container(
+        docker_client, _sleep_spec(policy, live_id, 120)
+    )
+    stale = container_runtime.create_container(
+        docker_client, _sleep_spec(policy, stale_id, 120)
+    )
+    try:
+        live.start()
+        stale.start()
+        result = lifecycle.recover_orphans(db_session_factory, docker_client)
+        assert result["failed"] == 0
+        assert stale_id in result["pruned_ids"]
+        assert live_id not in result["pruned_ids"]
+        with pytest.raises(docker.errors.NotFound):
+            docker_client.containers.get(stale.name)
+        docker_client.containers.get(live.name)
+        check = db_session_factory()
+        try:
+            assert check.get(SandboxExecution, uuid.UUID(hex=live_id)).cleanup_status == (
+                "pending"
+            )
+            assert check.get(SandboxExecution, uuid.UUID(hex=stale_id)).cleanup_status == (
+                "cleaned"
+            )
+        finally:
+            check.close()
+    finally:
+        container_runtime.destroy_container(stale)
+        container_runtime.destroy_container(live)
+
+
+def test_daemon_build_memory_cap_enforced(
+    docker_client,  # type: ignore[no-untyped-def]
+) -> None:
+    """Build memory limits reach the daemon: a below-minimum cap fails.
+
+    Pins the empirically verified behavior (classic-builder minimum
+    error). If a future daemon starts ignoring build limits, this fails
+    loudly instead of letting the claim go stale.
+    """
+    work = workspace.create_workspace()
+    try:
+        with open(os.path.join(work, "app.py"), "w") as handle:
+            handle.write("print(1)\n")
+        context, _digest = workspace.pack_build_context(work)
+        tag = f"meridian-test-buildcap-{uuid.uuid4().hex[:8]}"
+        try:
+            with pytest.raises(SandboxError) as exc_info:
+                container_runtime.build_source_image(
+                    client=docker_client, context_tar=context, tag=tag,
+                    memory_bytes=4 * 1024 * 1024,
+                )
+            assert exc_info.value.code == "IMAGE_BUILD_FAILED"
+        finally:
+            container_runtime.remove_image(docker_client, tag)
+    finally:
+        workspace.destroy_workspace(work)

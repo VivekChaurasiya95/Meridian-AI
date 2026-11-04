@@ -89,9 +89,7 @@ def _latest_snapshot(session: Session, project_id: uuid.UUID) -> RepositorySnaps
 
 def _snapshot_count(session: Session, project_id: uuid.UUID) -> int:
     return (
-        session.execute(
-            select(func.count()).where(RepositorySnapshot.project_id == project_id)
-        )
+        session.execute(select(func.count()).where(RepositorySnapshot.project_id == project_id))
     ).scalar_one()
 
 

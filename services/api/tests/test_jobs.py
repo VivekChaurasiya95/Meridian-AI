@@ -123,9 +123,7 @@ def test_claim_is_exclusive(auth_client: TestClient, db_session: Session) -> Non
     assert job_service.claim_job(db_session, "worker-b", ("lifecycle_test",), 60) is None
 
 
-def test_concurrent_claim_single_winner(
-    auth_client: TestClient, db_session: Session
-) -> None:
+def test_concurrent_claim_single_winner(auth_client: TestClient, db_session: Session) -> None:
     workspace = make_workspace(auth_client)
     submit(auth_client, workspace["id"])
     winners: list = []
@@ -171,9 +169,7 @@ def test_lease_expiry_recovers_job(auth_client: TestClient, db_session: Session)
     assert recovered["attempts"] == 2
 
 
-def test_heartbeat_and_completion_ownership(
-    auth_client: TestClient, db_session: Session
-) -> None:
+def test_heartbeat_and_completion_ownership(auth_client: TestClient, db_session: Session) -> None:
     workspace = make_workspace(auth_client)
     job = submit(auth_client, workspace["id"]).json()["data"]
     job_service.claim_job(db_session, "owner-w", ("lifecycle_test",), 60)
@@ -200,9 +196,7 @@ def test_complete_after_cancel_refused(auth_client: TestClient, db_session: Sess
     assert exc_info.value.code == "LEASE_LOST"
 
 
-def test_retry_backoff_and_max_attempts(
-    auth_client: TestClient, db_session: Session
-) -> None:
+def test_retry_backoff_and_max_attempts(auth_client: TestClient, db_session: Session) -> None:
     workspace = make_workspace(auth_client)
     response = auth_client.post(
         f"/api/v1/workspaces/{workspace['id']}/jobs",
@@ -238,7 +232,11 @@ def test_stage_lifecycle(auth_client: TestClient, db_session: Session) -> None:
     first = job_service.record_stage(db_session, job_id, "stage-w", "fetch_manifest", "running")
     assert first["attempt"] == 1
     done = job_service.record_stage(
-        db_session, job_id, "stage-w", "fetch_manifest", "completed",
+        db_session,
+        job_id,
+        "stage-w",
+        "fetch_manifest",
+        "completed",
         result_summary={"file_count": 3},
     )
     assert done["status"] == "completed"
@@ -254,3 +252,62 @@ def test_stage_lifecycle(auth_client: TestClient, db_session: Session) -> None:
     stages = auth_client.get(f"/api/v1/jobs/{job['id']}/stages").json()["data"]["stages"]
     assert len(stages) == 2
     assert stages[0]["result_summary"] == {"file_count": 3}
+
+
+def test_workspace_cap_yields_to_other_workspaces(
+    auth_client: TestClient, db_session: Session
+) -> None:
+    ws_a = make_workspace(auth_client, "wscap-a")
+    ws_b = make_workspace(auth_client, "wscap-b")
+    assert submit(auth_client, ws_a["id"]).status_code == 201
+    assert submit(auth_client, ws_a["id"]).status_code == 201
+    assert submit(auth_client, ws_b["id"]).status_code == 201
+    first = job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1)
+    assert first is not None and first["workspace_id"] == ws_a["id"]
+    # Workspace A holds one live job: its second job waits while B proceeds.
+    second = job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1)
+    assert second is not None and second["workspace_id"] == ws_b["id"]
+    assert (
+        job_service.claim_job(db_session, "w-cap", ("lifecycle_test",), 60, workspace_cap=1)
+        is None
+    )
+
+
+def test_expired_lease_does_not_count_toward_cap(
+    auth_client: TestClient, db_session: Session
+) -> None:
+    ws = make_workspace(auth_client, "wscap-e")
+    assert submit(auth_client, ws["id"]).status_code == 201
+    claimed = job_service.claim_job(db_session, "w-e1", ("lifecycle_test",), 60, workspace_cap=1)
+    assert claimed is not None
+    db_session.execute(
+        text("UPDATE jobs SET lease_expires_at = now() - interval '1 minute'"
+             " WHERE id = :id"),
+        {"id": claimed["id"]},
+    )
+    db_session.commit()
+    # The expired lease is reclaimable, not live: the cap must not block it.
+    reclaimed = job_service.claim_job(
+        db_session, "w-e2", ("lifecycle_test",), 60, workspace_cap=1
+    )
+    assert reclaimed is not None and reclaimed["id"] == claimed["id"]
+    assert reclaimed["attempts"] == claimed["attempts"] + 1
+
+
+def test_claim_cap_defaults_to_trusted_setting(
+    auth_client: TestClient, db_session: Session
+) -> None:
+    ws = make_workspace(auth_client, "wscap-d")
+    assert submit(auth_client, ws["id"]).status_code == 201
+    claimed = job_service.claim_job(db_session, "w-d", ("lifecycle_test",), 60)
+    assert claimed is not None
+
+
+def test_invalid_workspace_cap_rejected(
+    auth_client: TestClient, db_session: Session
+) -> None:
+    ws = make_workspace(auth_client, "wscap-x")
+    assert submit(auth_client, ws["id"]).status_code == 201
+    with pytest.raises(ApiError) as exc_info:
+        job_service.claim_job(db_session, "w-x", ("lifecycle_test",), 60, workspace_cap=0)
+    assert exc_info.value.code == "VALIDATION_ERROR"

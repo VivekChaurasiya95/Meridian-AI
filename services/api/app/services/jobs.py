@@ -18,7 +18,7 @@ import uuid
 
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.config import get_settings
 from app.envelope import ApiError, access_denied, not_found
@@ -95,9 +95,7 @@ def backoff_for_attempt(attempts: int, base_seconds: int, cap_seconds: int) -> i
 
 def _check_transition(current: str, target: str) -> None:
     if target not in JOB_TRANSITIONS.get(current, frozenset()):
-        raise ApiError(
-            409, "INVALID_TRANSITION", f"Cannot move a job from {current} to {target}."
-        )
+        raise ApiError(409, "INVALID_TRANSITION", f"Cannot move a job from {current} to {target}.")
 
 
 def serialize_job(job: Job, include_payload: bool = True) -> dict:
@@ -202,9 +200,7 @@ def submit_job(
         try:
             snapshot_id = uuid.UUID(str(raw_snapshot))
         except (ValueError, TypeError, AttributeError):
-            raise ApiError(
-                422, "VALIDATION_ERROR", f"{job_type} needs a snapshot_id."
-            ) from None
+            raise ApiError(422, "VALIDATION_ERROR", f"{job_type} needs a snapshot_id.") from None
         from app.models import RepositorySnapshot
 
         visible = (
@@ -225,9 +221,7 @@ def submit_job(
             raise not_found("snapshot")
         project_row = (
             session.execute(
-                select(RepositorySnapshot.project_id).where(
-                    RepositorySnapshot.id == snapshot_id
-                )
+                select(RepositorySnapshot.project_id).where(RepositorySnapshot.id == snapshot_id)
             )
         ).scalar_one()
         project_id = project_row
@@ -280,9 +274,7 @@ def submit_job(
             raise
         return serialize_job(existing), False
     session.refresh(job)
-    logger.info(
-        "job created job_id=%s workspace_id=%s type=%s", job.id, workspace_id, job_type
-    )
+    logger.info("job created job_id=%s workspace_id=%s type=%s", job.id, workspace_id, job_type)
     return serialize_job(job), True
 
 
@@ -353,6 +345,7 @@ def claim_job(
     worker_id: str,
     job_types: tuple[str, ...],
     lease_seconds: int,
+    workspace_cap: int | None = None,
 ) -> dict | None:
     """Atomically claim one eligible job (Phase 4).
 
@@ -360,12 +353,34 @@ def claim_job(
     (crash recovery). Exactly one worker wins via FOR UPDATE SKIP LOCKED.
     Attempts increment on every claim; exhausted jobs fail instead of
     running again. Returns None when no work is available.
+
+    A workspace holding ``workspace_cap`` live running jobs (expired
+    leases excluded: they are reclaimable, not live) yields to other
+    workspaces. ``None`` resolves to the trusted operator setting;
+    API payloads can never supply this value.
     """
     now = _db_now(session)
+    cap = workspace_cap
+    if cap is None:
+        cap = get_settings().sandbox_max_running_jobs_per_workspace
+    if cap < 1:
+        raise ApiError(422, "VALIDATION_ERROR", "The workspace cap is invalid.")
+    other = aliased(Job)
+    live_in_workspace = (
+        select(func.count())
+        .select_from(other)
+        .where(
+            other.workspace_id == Job.workspace_id,
+            other.status == "running",
+            other.lease_expires_at > now,
+        )
+        .scalar_subquery()
+    )
     stmt = (
         select(Job)
         .where(
             Job.job_type.in_(job_types),
+            live_in_workspace < cap,
             or_(
                 Job.status == "queued",
                 and_(Job.status == "retry_wait", Job.available_at <= now),
@@ -388,9 +403,7 @@ def claim_job(
         job.completed_at = now
         job.updated_at = now
         session.commit()
-        logger.info(
-            "job attempts exhausted job_id=%s worker_id=%s", job.id, worker_id
-        )
+        logger.info("job attempts exhausted job_id=%s worker_id=%s", job.id, worker_id)
         return None
     previous_worker = job.worker_id
     job.status = "running"
@@ -415,9 +428,7 @@ def claim_job(
     return serialize_job(job)
 
 
-def heartbeat_job(
-    session: Session, job_id: uuid.UUID, worker_id: str, lease_seconds: int
-) -> dict:
+def heartbeat_job(session: Session, job_id: uuid.UUID, worker_id: str, lease_seconds: int) -> dict:
     """Renew the lease. Refuses foreign or expired ownership (Phase 5)."""
     now = _db_now(session)
     updated = (
@@ -587,15 +598,11 @@ def record_stage(
         raise ApiError(422, "VALIDATION_ERROR", "The stage result must be an object.")
     job = (
         session.execute(
-            select(Job).where(
-                Job.id == job_id, Job.worker_id == worker_id, Job.status == "running"
-            )
+            select(Job).where(Job.id == job_id, Job.worker_id == worker_id, Job.status == "running")
         )
     ).scalar_one_or_none()
     if job is None:
-        raise ApiError(
-            409, "LEASE_LOST", "Stages can only be recorded by the owning worker."
-        )
+        raise ApiError(409, "LEASE_LOST", "Stages can only be recorded by the owning worker.")
     now = _db_now(session)
     latest = (
         session.execute(
@@ -647,8 +654,8 @@ def record_stage(
         latest.status = status
         if result_summary is not None:
             latest.result_summary = dict(result_summary)
-        latest.error_code = (error_code[:64] if error_code else None)
-        latest.error_message = (error_message[:2000] if error_message else None)
+        latest.error_code = error_code[:64] if error_code else None
+        latest.error_message = error_message[:2000] if error_message else None
         if status == "running" and latest.started_at is None:
             latest.started_at = now
         if status in ("completed", "failed", "blocked", "skipped", "cancelled"):

@@ -57,6 +57,21 @@ def test_spec_network_is_none() -> None:
     assert make_spec()["network_mode"] == "none"
 
 
+def test_spec_uses_daemon_default_seccomp() -> None:
+    """No custom or weakened seccomp: the daemon default applies.
+
+    M5.3 evaluation: a custom profile path must live inside the Docker
+    Desktop VM (unshippable from this repo), and the default already
+    constrains our non-root, capability-free, network-less containers.
+    If a custom profile ever ships, this test must be replaced by
+    allowlist-compatibility tests, never deleted.
+    """
+    spec = make_spec()
+    assert "unconfined" not in repr(spec["security_opt"])
+    assert not any(str(opt).startswith("seccomp=") for opt in spec["security_opt"])
+    assert "no-new-privileges:true" in spec["security_opt"]
+
+
 def test_spec_has_no_mounts_ports_or_socket() -> None:
     spec = make_spec()
     for forbidden in ("volumes", "mounts", "ports", "devices", "device_requests"):
