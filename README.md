@@ -288,7 +288,7 @@ MIT — see [LICENSE](LICENSE).
 
 <div align="center">
 
-**Vivek Chaurasiya** — Full-stack developer · Creator of Meridian AI
+**Vivek Chaurasiya && Arin Gupta** — Full-stack developer · Creator of Meridian AI
 
 [![GitHub](https://img.shields.io/badge/GitHub-VivekChaurasiya95-181717?logo=github&logoColor=white)](https://github.com/VivekChaurasiya95)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/vivek-chaurasiya-722037315)
