@@ -44,8 +44,16 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
+      set -e;
       mc alias set local http://minio:9000 minioadmin minioadmin;
       mc mb local/meridian-evidence --ignore-existing;
+      mc mb local/meridian-repositories --ignore-existing;
+      mc admin user add local meridian-worker meridian-worker-secret 2>/dev/null || true;
+      mc admin user info local meridian-worker;
+      printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::meridian-repositories","arn:aws:s3:::meridian-repositories/*"]}]}' > /tmp/sandbox-repositories-read.json;
+      mc admin policy create local sandbox-repositories-read /tmp/sandbox-repositories-read.json;
+      mc admin policy info local sandbox-repositories-read;
+      mc admin policy attach local sandbox-repositories-read --user meridian-worker;
       exit 0;
       "
 
@@ -73,20 +81,26 @@ services:
 
   worker:
     build:
-      context: ./services/worker
+      context: .
+      dockerfile: ./services/worker/Dockerfile
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      minio:
-        condition: service_healthy
     environment:
+      # Least privilege (M4/M5.2): the worker needs the database plus
+      # read-only repository-bucket access for snapshot materialization.
+      # Dev-only values for the dedicated read-only MinIO user created in
+      # minio-init; production must inject vault-managed secrets. Root
+      # MinIO credentials stay out, and untrusted execution containers
+      # never see any credentials at all.
       MERIDIAN_ENV: dev
       DATABASE_URL: postgresql+psycopg://meridian:meridian@db:5432/meridian
+      WORKER_ID: compose-worker-1
       S3_ENDPOINT_URL: http://minio:9000
-      S3_ACCESS_KEY: minioadmin
-      S3_SECRET_KEY: minioadmin
-      S3_BUCKET_NAME: meridian-evidence
+      S3_ACCESS_KEY: meridian-worker
+      S3_SECRET_KEY: meridian-worker-secret
+      S3_REGION: us-east-1
     security_opt:
       - no-new-privileges:true
 

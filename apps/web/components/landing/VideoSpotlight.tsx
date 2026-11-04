@@ -205,7 +205,7 @@ function WatchTheWorkDemo() {
               onClick={() => selectTab(i)}
               aria-pressed={selected}
               className={cn(
-                "flex shrink-0 cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 font-mono text-xs font-medium transition-all duration-200",
+                "flex shrink-0 cursor-pointer items-center gap-2 rounded-full px-3.5 py-2 font-mono text-xs font-medium transition-all duration-200 active:scale-[0.97]",
                 selected
                   ? "bg-sage-subtle text-sage shadow-card"
                   : "text-ink-3 hover:bg-surface-3 hover:text-ink-2",
@@ -222,7 +222,7 @@ function WatchTheWorkDemo() {
             type="button"
             onClick={() => (finished ? replay() : setPlaying((p) => !p))}
             aria-label={playing ? "Pause demo" : "Play demo"}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors duration-200 hover:border-line-strong hover:text-ink"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-all duration-200 hover:border-line-strong hover:text-ink active:scale-95"
           >
             {playing ? (
               <Pause aria-hidden="true" className="size-3.5 fill-current" />
@@ -234,7 +234,7 @@ function WatchTheWorkDemo() {
             type="button"
             onClick={replay}
             aria-label="Replay demo"
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-colors duration-200 hover:border-line-strong hover:text-ink"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-line text-ink-2 transition-all duration-200 hover:border-line-strong hover:text-ink active:scale-95"
           >
             <RotateCcw aria-hidden="true" className="size-3.5" />
           </button>

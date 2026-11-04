@@ -24,6 +24,12 @@ def login_limiter() -> SlidingWindowLimiter:
     return SlidingWindowLimiter(settings.login_max_attempts, settings.login_window_seconds)
 
 
+@lru_cache(maxsize=1)
+def upload_limiter() -> SlidingWindowLimiter:
+    settings = get_settings()
+    return SlidingWindowLimiter(settings.upload_rate_max, settings.upload_rate_window_seconds)
+
+
 def get_request_id(request: Request) -> str:
     """Resolve the request ID: middleware-attached state first, then header.
 

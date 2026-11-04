@@ -47,6 +47,49 @@ class Settings(BaseSettings):
     page_default_limit: int = 25
     page_max_limit: int = 100
 
+    # Project archive ingestion (M3). All sizes in bytes unless named *_mb.
+    # Uploads are processed synchronously in the request (no M4 job queue
+    # yet), so caps stay conservative. Documented in .env.example.
+    upload_max_mb: int = Field(default=25, ge=1, le=256)
+    extracted_max_mb: int = Field(default=200, ge=1, le=2048)
+    max_archive_files: int = Field(default=5000, ge=1, le=50000)
+    max_archive_depth: int = Field(default=20, ge=1, le=64)
+    max_compression_ratio: int = Field(default=100, ge=1, le=1000)
+    preview_max_bytes: int = Field(default=65536, ge=1024, le=1048576)
+    index_budget_bytes: int = Field(default=2097152, ge=65536, le=16777216)
+
+    # Upload rate limiting (M4 hardening, same dev-scale sliding window as
+    # login per D20): per-user caps so concurrent uploads cannot exhaust
+    # the API workers that process archives synchronously.
+    upload_rate_max: int = Field(default=20, ge=1, le=1000)
+    upload_rate_window_seconds: int = Field(default=3600, ge=60, le=86400)
+
+    # Durable jobs (M4). Lease/heartbeat follow D10 (60s TTL default).
+    worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
+    worker_heartbeat_seconds: int = Field(default=20, ge=5, le=600)
+    worker_poll_seconds: int = Field(default=5, ge=1, le=120)
+    job_max_attempts: int = Field(default=5, ge=1, le=25)
+    job_retry_base_seconds: int = Field(default=30, ge=1, le=3600)
+    job_retry_max_seconds: int = Field(default=3600, ge=60, le=86400)
+
+    # Immutable snapshot content storage (M5.1, private MinIO bucket).
+    # NOTE for local runs: the host-mapped MinIO API port is 9010, so a
+    # local .env needs S3_ENDPOINT_URL=http://localhost:9010 (the
+    # in-container default below only fits Docker networking).
+    s3_endpoint_url: str = "http://minio:9000"
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+    s3_region: str = "us-east-1"
+    s3_repositories_bucket: str = "meridian-repositories"
+
+    @property
+    def upload_max_bytes(self) -> int:
+        return self.upload_max_mb * 1024 * 1024
+
+    @property
+    def extracted_max_bytes(self) -> int:
+        return self.extracted_max_mb * 1024 * 1024
+
     @field_validator("database_url")
     @classmethod
     def _require_postgres(cls, value: str) -> str:

@@ -43,7 +43,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {trailing}
         </div>
         {error ? (
-          <p id={errorId} role="alert" className="text-[13px] font-medium text-danger">
+          <p id={errorId} role="alert" className="animate-alert-in text-[13px] font-medium text-danger">
             {error}
           </p>
         ) : hint ? (

@@ -185,12 +185,14 @@ export default function WorkspaceDetailPage() {
             <FolderKanban aria-hidden="true" className="size-5 text-accent" />
           </span>
           <div>
-            <p className="font-medium">Project onboarding arrives in Milestone 3</p>
+            <p className="font-medium">Manage this workspace&apos;s codebases</p>
             <p className="mt-1 text-[13px] text-ink-2">
-              Secure source ingestion, snapshots, and runtime profiles are not built yet.
+              Upload ZIP archives, inspect stacks, and browse immutable snapshots.
             </p>
           </div>
-          <Badge tone="neutral">M3</Badge>
+          <Link href={`/app/projects?workspace=${id}`}>
+            <Button variant="secondary">View projects</Button>
+          </Link>
         </CardContent>
       </Card>
     </div>

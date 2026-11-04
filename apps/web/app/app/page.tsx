@@ -90,7 +90,7 @@ export default function OverviewPage() {
       </div>
 
       {state.status === "loading" && (
-        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="grid animate-fade-in gap-6 lg:grid-cols-[1.6fr_1fr]">
           <div className="flex flex-col gap-3" aria-label="Loading workspaces">
             <Skeleton className="h-[76px]" />
             <Skeleton className="h-[76px]" />
@@ -117,7 +117,7 @@ export default function OverviewPage() {
       )}
 
       {state.status === "ready" && (
-        <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="grid animate-fade-in items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
           <section aria-label="Workspaces" className="flex min-w-0 flex-col gap-4">
             {state.items.length === 0 ? (
               <Card>

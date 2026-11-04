@@ -1,24 +1,24 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
-WORKDIR /srv/meridian-worker
+WORKDIR /srv/meridian
 
-# Install base tools for inspection and git reproduction
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# The worker calls the API service layer directly (D45: no worker HTTP
+# credentials), so it installs the same runtime dependencies.
+COPY services/api/pyproject.toml ./services/api/
+COPY services/api/app ./services/api/app
+RUN pip install --no-cache-dir ./services/api
 
-# Isolated unprivileged execution user (ADR-006: non-root execution)
+COPY services/worker/main.py ./services/worker/main.py
+COPY services/worker/sandbox ./services/worker/sandbox
+
+# Isolated unprivileged execution user (ADR-006: non-root execution).
+# M5+ untrusted execution must run as an even more restricted identity.
 RUN useradd --create-home --uid 10002 meridian-sandbox
-
-WORKDIR /workspace
-RUN chown -R meridian-sandbox:meridian-sandbox /workspace
-
-COPY main.py /srv/meridian-worker/main.py
-
+RUN chown -R meridian-sandbox:meridian-sandbox /srv/meridian
 USER 10002
 
-ENTRYPOINT ["python", "/srv/meridian-worker/main.py"]
+ENTRYPOINT ["python", "services/worker/main.py"]

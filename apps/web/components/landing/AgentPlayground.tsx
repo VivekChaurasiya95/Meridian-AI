@@ -392,13 +392,22 @@ export function AgentPlayground() {
                         aria-label={`Switch to ${item.label}`}
                         aria-pressed={i === mode}
                         className={cn(
-                          "flex size-9 cursor-pointer items-center justify-center rounded-xl transition-all duration-200",
+                          "relative flex size-9 cursor-pointer items-center justify-center rounded-xl transition-colors duration-200",
                           i === mode
-                            ? "bg-[#e8eee1] text-[#10130f]"
+                            ? reduceMotion
+                              ? "bg-[#e8eee1] text-[#10130f]"
+                              : "text-[#10130f]"
                             : "text-[#8b937f] hover:bg-white/10 hover:text-[#eef2e6]",
                         )}
                       >
-                        <item.icon aria-hidden="true" className="size-4" />
+                        {i === mode && !reduceMotion && (
+                          <motion.span
+                            layoutId="playground-dock-pill"
+                            className="absolute inset-0 rounded-xl bg-[#e8eee1]"
+                            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                          />
+                        )}
+                        <item.icon aria-hidden="true" className="relative size-4" />
                       </button>
                     ))}
                     <span aria-hidden="true" className="mx-1 h-5 w-px bg-white/10" />
@@ -432,14 +441,25 @@ export function AgentPlayground() {
                       onClick={() => selectMode(i)}
                       aria-pressed={i === mode}
                       className={cn(
-                        "flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-200",
+                        "relative flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors duration-200",
                         i === mode
-                          ? "bg-ink text-canvas shadow-card"
+                          ? reduceMotion
+                            ? "bg-ink text-canvas shadow-card"
+                            : "text-canvas"
                           : "text-ink-3 hover:bg-surface-3/60 hover:text-ink-2",
                       )}
                     >
-                      <item.icon aria-hidden="true" className="size-4" />
-                      {item.label}
+                      {i === mode && !reduceMotion && (
+                        <motion.span
+                          layoutId="playground-mode-pill"
+                          className="absolute inset-0 rounded-full bg-ink shadow-card"
+                          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                      )}
+                      <span className="relative flex items-center gap-2">
+                        <item.icon aria-hidden="true" className="size-4" />
+                        {item.label}
+                      </span>
                     </button>
                   ))}
                 </div>

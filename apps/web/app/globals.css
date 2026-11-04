@@ -61,6 +61,9 @@
   --animate-spin-slow: spin 14s linear infinite;
   --animate-dropdown-in: dropdown-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-rise-in: rise-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.3s ease-out both;
+  --animate-alert-in: alert-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
   --animate-blink-eyes: blink-eyes 4.2s ease-in-out infinite;
 
   @keyframes marquee {
@@ -92,6 +95,18 @@
   @keyframes rise-in {
     from { opacity: 0; transform: translateY(18px); filter: blur(4px); }
     to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes alert-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
   }
 }
 

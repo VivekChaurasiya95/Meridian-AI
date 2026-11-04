@@ -67,7 +67,8 @@ def _truncate(database_url: str) -> None:
     with engine.begin() as connection:
         connection.execute(
             text(
-                "TRUNCATE local_credentials, sessions, workspace_members, "
+                "TRUNCATE job_stages, jobs, snapshot_files, repository_snapshots, projects, "
+                "local_credentials, sessions, workspace_members, "
                 "workspaces, users RESTART IDENTITY CASCADE"
             )
         )
@@ -141,3 +142,14 @@ def auth_client_factory(migrated_db: str):
 def auth_client(auth_client_factory):  # type: ignore[no-untyped-def]
     """Single authenticated client (owner@example.com)."""
     return auth_client_factory("owner@example.com")
+
+
+@pytest.fixture()
+def db_session_factory(migrated_db: str):  # type: ignore[no-untyped-def]
+    """Direct SQLAlchemy sessions for service-level tests (same test DB)."""
+    from sqlalchemy.orm import sessionmaker
+
+    engine = create_engine(migrated_db)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    yield factory
+    engine.dispose()

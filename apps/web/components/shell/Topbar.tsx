@@ -38,7 +38,7 @@ function WorkspaceSwitcher() {
       trigger={
         <span className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-line bg-surface-1 px-3 text-[13px] font-semibold text-ink-2 shadow-[inset_0_1px_0_rgb(255_255_255/0.4)] transition-all duration-200 hover:border-line-strong hover:text-ink dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]">
           Workspaces
-          <ChevronDown aria-hidden="true" className="size-3.5 opacity-70" />
+          <ChevronDown aria-hidden="true" className="size-3.5 opacity-70 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </span>
       }
     >
@@ -92,7 +92,7 @@ function UserMenu() {
           <span className="hidden max-w-40 truncate text-[13px] font-semibold text-ink md:block">
             {user?.display_name ?? user?.email ?? "Account"}
           </span>
-          <ChevronDown aria-hidden="true" className="size-3.5 text-ink-3" />
+          <ChevronDown aria-hidden="true" className="size-3.5 text-ink-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </span>
       }
     >

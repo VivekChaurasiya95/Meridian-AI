@@ -65,3 +65,33 @@ class MemberCreate(StrictModel):
 
 class MemberUpdate(StrictModel):
     role: AssignableRole
+
+
+class ProjectCreate(StrictModel):
+    # M3 accepts uploaded archives only; git_provider arrives with the
+    # (unbuilt) provider integration. The runtime profile is server-derived
+    # from inspection — clients cannot set execution configuration.
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=100, pattern=SLUG_PATTERN)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class ProjectUpdate(StrictModel):
+    # Allowlist: name and description only. Source, slug, status, and
+    # runtime profile change through their own guarded operations.
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class JobSubmit(StrictModel):
+    # Payload stays a caller-supplied object; the worker validates the
+    # fields its own job type needs. Result/worker internals are never
+    # accepted here.
+    job_type: Literal["lifecycle_test", "manifest_recheck", "sandbox_smoke"]
+    payload: dict = Field(default_factory=dict)
+    idempotency_key: str | None = Field(
+        default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.\-]+$"
+    )
+    priority: int = Field(default=0, ge=0, le=1000)
+    max_attempts: int | None = Field(default=None, ge=1, le=25)
+

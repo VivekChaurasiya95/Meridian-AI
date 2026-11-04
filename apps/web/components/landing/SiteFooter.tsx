@@ -15,6 +15,7 @@ const COLUMNS: { title: string; links: { label: string; href: string; external?:
       { label: "Workflow", href: "/#workflow" },
       { label: "Principles", href: "/#principles" },
       { label: "Demo video", href: "/#demo" },
+      { label: "FAQ", href: "/#faq" },
       { label: "Build status", href: "/#status" },
     ],
   },
@@ -112,7 +113,7 @@ export function SiteFooter() {
                 <ThemeToggle />
                 <span className="inline-flex items-center gap-2 rounded-full border border-line bg-canvas px-3 py-1.5">
                   <span aria-hidden="true" className="size-2 animate-pulse-dot rounded-full bg-success" />
-                  <span className="font-mono text-[11px] font-medium text-ink-2">Milestone 2 · live</span>
+                  <span className="font-mono text-[11px] font-medium text-ink-2">Milestone 3 · live</span>
                 </span>
               </div>
             </div>

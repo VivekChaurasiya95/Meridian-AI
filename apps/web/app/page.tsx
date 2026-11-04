@@ -3,10 +3,12 @@ import { ArrowRight, ArrowUpRight, Bug, Camera, FlaskConical, GitPullRequest, Se
 import { MeridianLogo } from "@/components/brand/Logo";
 import { AgentPlayground } from "@/components/landing/AgentPlayground";
 import { DeveloperSection } from "@/components/landing/DeveloperSection";
+import { FaqSection } from "@/components/landing/FaqSection";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { VideoSpotlight } from "@/components/landing/VideoSpotlight";
 import { ThemeToggle } from "@/components/shell/ThemeToggle";
 import { Badge } from "@/components/ui/Badge";
+import { Meter } from "@/components/ui/Meter";
 import { Reveal } from "@/components/ui/Reveal";
 import { StaggerHeadline, RotatingWord } from "@/components/ui/AnimatedHeadline";
 
@@ -51,11 +53,12 @@ export default function LandingPage() {
             <MeridianLogo markSize={26} />
           </Link>
           <nav aria-label="Landing" className="ml-10 hidden items-center gap-7 text-[13px] font-semibold text-ink-2 md:flex">
-            <a href="#workflow" className="transition-colors hover:text-sage">Workflow</a>
-            <a href="#principles" className="transition-colors hover:text-sage">Principles</a>
-            <a href="#demo" className="transition-colors hover:text-sage">Demo</a>
-            <a href="#status" className="transition-colors hover:text-sage">Status</a>
-            <Link href="/developer" className="transition-colors hover:text-sage">Developer</Link>
+            <a href="#workflow" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Workflow</a>
+            <a href="#principles" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Principles</a>
+            <a href="#demo" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Demo</a>
+            <a href="#faq" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">FAQ</a>
+            <a href="#status" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Status</a>
+            <Link href="/developer" className="underline decoration-transparent decoration-2 underline-offset-4 transition-all duration-200 hover:text-sage hover:decoration-sage/60">Developer</Link>
           </nav>
           <span className="ml-auto flex items-center gap-2.5">
             <ThemeToggle />
@@ -90,40 +93,46 @@ export default function LandingPage() {
                   <RotatingWord words={TICKER_WORDS} />
                 </em>
               </h1>
-              <p className="mt-6 max-w-xl text-[15px] leading-7 text-ink-2">
-                Meridian turns a bug report into a structured investigation: it reproduces the
-                failure in isolation, captures the evidence, proposes hypotheses linked to that
-                evidence, and verifies every patch with real test runs — with you approving each step.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/app"
-                  className="group inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-6 text-[15px] font-semibold text-accent-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_12px_28px_-10px_var(--color-accent)] transition-all duration-200 hover:bg-accent-hover active:scale-[0.98]"
-                >
-                  Open the workspace
-                  <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                </Link>
-                <a
-                  href="#workflow"
-                  className="inline-flex h-12 items-center gap-1.5 rounded-xl border border-line bg-surface-1 px-6 text-[15px] font-semibold text-ink-2 shadow-card transition-all duration-200 hover:border-line-strong hover:text-ink"
-                >
-                  How it works
-                  <ArrowUpRight aria-hidden="true" className="size-4 opacity-70" />
-                </a>
-              </div>
-              <dl className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line/70 pt-6">
-                {[
-                  ["07", "pipeline stages"],
-                  ["M1–M2", "live today"],
-                  ["0", "patches without approval"],
-                ].map(([value, label]) => (
-                  <div key={label} className="flex items-baseline gap-2">
-                    <dt className="sr-only">{label}</dt>
-                    <dd className="font-display text-2xl font-semibold text-ink">{value}</dd>
-                    <dd className="text-[13px] text-ink-3">{label}</dd>
-                  </div>
-                ))}
-              </dl>
+              <Reveal delay={0.35}>
+                <p className="mt-6 max-w-xl text-[15px] leading-7 text-ink-2">
+                  Meridian turns a bug report into a structured investigation: it reproduces the
+                  failure in isolation, captures the evidence, proposes hypotheses linked to that
+                  evidence, and verifies every patch with real test runs — with you approving each step.
+                </p>
+              </Reveal>
+              <Reveal delay={0.45}>
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/app"
+                    className="group inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-6 text-[15px] font-semibold text-accent-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_12px_28px_-10px_var(--color-accent)] transition-all duration-200 hover:bg-accent-hover active:scale-[0.98]"
+                  >
+                    Open the workspace
+                    <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </Link>
+                  <a
+                    href="#workflow"
+                    className="inline-flex h-12 items-center gap-1.5 rounded-xl border border-line bg-surface-1 px-6 text-[15px] font-semibold text-ink-2 shadow-card transition-all duration-200 hover:border-line-strong hover:text-ink"
+                  >
+                    How it works
+                    <ArrowUpRight aria-hidden="true" className="size-4 opacity-70" />
+                  </a>
+                </div>
+              </Reveal>
+              <Reveal delay={0.55}>
+                <dl className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line/70 pt-6">
+                  {[
+                    ["07", "pipeline stages"],
+                    ["M1–M2", "live today"],
+                    ["0", "patches without approval"],
+                  ].map(([value, label]) => (
+                    <div key={label} className="flex items-baseline gap-2">
+                      <dt className="sr-only">{label}</dt>
+                      <dd className="font-display text-2xl font-semibold text-ink">{value}</dd>
+                      <dd className="text-[13px] text-ink-3">{label}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Reveal>
             </div>
 
             {/* Investigation ledger */}
@@ -149,7 +158,7 @@ export default function LandingPage() {
                   <span className="font-mono text-[11px] font-medium text-success">sandbox · healthy</span>
                 </div>
               </figure>
-              <div className="absolute -bottom-5 left-6 flex items-center gap-2.5 rounded-xl border border-line bg-surface-1 py-2.5 pr-4 pl-2.5 shadow-pop">
+              <div className="absolute -bottom-5 left-6 flex animate-float items-center gap-2.5 rounded-xl border border-line bg-surface-1 py-2.5 pr-4 pl-2.5 shadow-pop">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-success/15 text-success">
                   <ShieldCheck aria-hidden="true" className="size-4" />
                 </span>
@@ -167,7 +176,7 @@ export default function LandingPage() {
 
         {/* Capability marquee */}
         <div aria-hidden="true" className="overflow-hidden border-y border-line/70 bg-surface-1/60 py-3.5">
-          <div className="flex w-max animate-marquee gap-0">
+          <div className="flex w-max animate-marquee gap-0 hover:[animation-play-state:paused]">
             {[0, 1].map((copy) => (
               <div key={copy} className="flex shrink-0 items-center">
                 {MARQUEE.map((item) => (
@@ -261,6 +270,10 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <div aria-hidden="true" className="rule-fade mx-auto max-w-6xl" />
+
+        <FaqSection />
+
         {/* Build status — warm panel */}
         <section id="status" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-16 sm:px-6 md:pb-24">
           <Reveal>
@@ -269,15 +282,15 @@ export default function LandingPage() {
               <div className="grid gap-10 p-8 sm:p-12 md:grid-cols-[1.2fr_0.8fr] md:items-center">
                 <div>
                   <p className="font-mono text-xs font-medium tracking-[0.14em] text-sage uppercase">
-                    Build status · Milestones 1–2 live
+                    Build status · Milestones 1–3 live
                   </p>
                   <h2 className="font-display mt-4 text-3xl leading-[1.1] font-semibold tracking-tight text-balance">
                     Under active construction, honestly labeled.
                   </h2>
                   <p className="mt-4 max-w-xl leading-7 text-ink-2">
-                    The application shell, session authentication, and workspace management with
-                    membership roles are live in this workspace, backed by PostgreSQL. Project
-                    onboarding and the investigation pipeline follow in Milestones 3–10.
+                    The application shell, session authentication, workspace management, and
+                    project onboarding with immutable snapshots are live in this workspace,
+                    backed by PostgreSQL. The investigation pipeline follows in Milestones 4–10.
                   </p>
                   <div className="mt-7 flex flex-wrap gap-3">
                     <Link
@@ -299,11 +312,11 @@ export default function LandingPage() {
                   <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-3 uppercase">Progress</p>
                   <ol className="mt-4 flex flex-col gap-3.5">
                     {[
-                      ["Shell & theming", "done"],
-                      ["Auth & workspaces", "done"],
-                      ["Project onboarding", "next"],
-                      ["Investigation pipeline", "planned"],
-                    ].map(([label, state]) => (
+                      ["Shell & theming", "done", "live"],
+                      ["Auth & workspaces", "done", "live"],
+                      ["Project onboarding", "done", "live"],
+                      ["Investigation pipeline", "next", "M4"],
+                    ].map(([label, state, tag]) => (
                       <li key={label} className="flex items-center gap-3 text-[13px]">
                         <span
                           aria-hidden="true"
@@ -317,14 +330,12 @@ export default function LandingPage() {
                         />
                         <span className={state === "planned" ? "text-ink-3" : "font-medium text-ink"}>{label}</span>
                         <span className="ml-auto font-mono text-[11px] text-ink-3">
-                          {state === "done" ? "live" : state === "next" ? "M3" : "M4–M10"}
+                          {tag}
                         </span>
                       </li>
                     ))}
                   </ol>
-                  <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-surface-3">
-                    <div className="h-full w-[22%] rounded-full bg-sage" />
-                  </div>
+                  <Meter value={30} label="Milestone progress" className="mt-5" />
                 </div>
               </div>
             </div>

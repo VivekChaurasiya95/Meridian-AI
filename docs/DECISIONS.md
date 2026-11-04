@@ -206,3 +206,96 @@ contracts > Database spec > Design system > Implementation plan > existing code.
   image-input support — must be spiked against the live provider; deterministic
   test doubles until then.
 - O5 (M3+): Object-store product, signed-URL TTL, retention windows.
+
+## Milestone 3 decisions
+
+- **D37 — Project slug is unique per workspace.** Workspaces stay globally
+  unique (C7); projects live under a workspace, so `UNIQUE(workspace_id,
+  slug)` matches routing needs. Conflicts return `409 RESOURCE_CONFLICT`.
+- **D38 — Single-shot multipart upload, no upload sessions.** API.md §6.6
+  describes session-based resumable uploads for large files. With the 25 MB
+  cap, one `POST …/source-uploads` (multipart ZIP) is sufficient and
+  honest; resumable sessions are deferred, not faked.
+- **D39 — Synchronous in-request ingestion.** No M4 job queue exists yet
+  (C5), so validation → extraction → inspection → snapshot runs inside the
+  upload request under strict caps. The endpoint returns only after backend
+  work completes; the wizard shows real upload progress, then a processing
+  state — never staged fake progress.
+- **D40 — Archive bytes are not retained.** After inspection the temp dir
+  is removed. The snapshot keeps metadata, the `snapshot_files` index, and
+  small text previews — the immutable source context investigations need.
+  No new object-storage dependency for M3 (O5 stays open).
+- **D41 — `snapshot_files` index table.** The spec's `manifest` jsonb holds
+  counts and detected stack; per-file rows (path, size, sha256, text flag,
+  capped preview) power browsing without row bloat. Secret and generated
+  files are never indexed (counts recorded in the manifest).
+- **D42 — Project role policy.** Read: all members. Create/upload:
+  owner/admin/developer. Update/archive/unarchive: owner/admin. Delete:
+  owner only (snapshots + file rows deleted first in one transaction, FK
+  RESTRICT respected). Viewers are read-only. Non-members get 404.
+- **D43 — Projects list UX.** `/app/projects` is workspace-scoped via
+  `?workspace=` (defaults to the first workspace) because the app has no
+  global workspace context. Summary cards are pure backend counts; "needs
+  attention" = setup_failed + active projects without a snapshot.
+- **D44 — No Git source UI.** `source_type` accepts `uploaded_archive`
+  only until the provider integration exists; the Git option renders
+  visibly disabled, never as a working integration.
+
+## Milestone 4 decisions
+
+- **D45 — Workers use the service layer, not HTTP.** Claim/heartbeat/
+  complete/fail run inside the worker process against Postgres, so no
+  worker credentials exist to leak; the public API exposes only
+  submit/list/get/cancel/stages. Job list views withhold payloads.
+- **D46 — Single-shot upload sessions deferred (again).** The 25 MB cap
+  keeps one multipart POST sufficient; resumable sessions stay deferred.
+- **D47 — DB time drives leases.** `_db_now()` (SELECT now()) timestamps
+  every lease decision so API and worker hosts never disagree on expiry.
+- **D48 — Safe job types only.** The M4 worker runs `lifecycle_test`
+  (echo) and `manifest_recheck` (DB-row digest recompute). CHECK
+  constraints bound `job_type`; unknown types fail permanently without
+  retry. No repo code, shells, installs, or user apps execute.
+- **D49 — Recovery is inline.** Expired leases are reclaimed by the next
+  claim (attempts increment; exhaustion fails the job). Cancelled jobs
+  are never requeued, and stale workers' completions are refused.
+- **D50 — Stages are generic rows, not fabricated futures.** `job_stages`
+  persists real worker-recorded transitions; the 12 investigation stage
+  keys are known labels only — unimplemented stages return nothing
+  rather than invented results.
+
+## Milestone 5.1 decisions
+
+- **D51 — Immutable content lives in MinIO, metadata in Postgres.**
+  Ingestion packs exactly the indexed file set into a deterministic tar
+  (sorted members, PAX, zeroed mtime/uid/gid, mode 0600) stored at
+  `snapshots/<sha256[0:2]>/<sha256>.tar` in the private
+  `meridian-repositories` bucket. Identical bytes share one key; the
+  object is deleted only when no snapshot row references it. Postgres
+  keeps `storage_status` (`pending/uploading/ready/failed/deleting/
+  deleted/integrity_failed`), `storage_key`, `storage_bytes`,
+  `storage_verified_at`, and error fields — never credentials. Only
+  `ready` snapshots are eligible for future sandbox execution; legacy
+  M3 rows (no key) can never become ready.
+- **D52 — Ready means object + row both confirmed.** The endpoint returns
+  success only after MinIO upload, row commit, and a read-back digest
+  check. DB-commit failure after a fresh upload deletes the orphan
+  object; a missing/mismatched object marks the snapshot `failed` or
+  `integrity_failed` instead of succeeding.
+- **D53 — Retrieval never executes.** Materialization verifies the
+  object digest, per-file hashes, and index set-equality under existing
+  archive caps, into a caller-provided empty directory only. The worker
+  receives no storage credentials; only the backend storage service
+  touches MinIO.
+
+## Milestone 5.2 decisions
+
+- **D54 — Reserved build filename closes the Dockerfile collision.**
+  The per-execution build context names its trusted build file
+  `Meridian.Dockerfile` (passed explicitly via `dockerfile=`) instead
+  of `Dockerfile`, so a snapshot root file named `Dockerfile` stays
+  inert data copied to `/work` and can never supply build
+  instructions. Snapshots containing a root `Meridian.Dockerfile` or
+  `.dockerignore` fail closed (`RESERVED_FILENAME`); the same names
+  nested in subdirectories are data. Image builds also run with
+  `network_mode="none"`, since the fixed file has no RUN steps and
+  `pull=False`.

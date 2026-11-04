@@ -5,6 +5,15 @@ description = "Meridian AI backend API (FastAPI + PostgreSQL)."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
+    # Multipart parsing for ZIP source uploads (M3). No other new runtime
+    # dependency: archives land in Postgres + temp dirs, not object storage.
+    "python-multipart>=0.0.18",
+    # S3-compatible private snapshot content storage (M5.1, MinIO).
+    # Pure-python client; no build toolchain needed.
+    "boto3>=1.34",
+    # Container runtime SDK for the M5.2 sandbox orchestrator (worker only
+    # ever talks to the local Docker Desktop daemon; never a remote one).
+    "docker>=7",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.7",
     "pydantic-settings>=2.5",

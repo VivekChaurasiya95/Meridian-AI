@@ -24,18 +24,24 @@ export function AuthLayout({
   return (
     <div className="texture-grain grid min-h-screen bg-canvas lg:grid-cols-[1fr_1fr]">
       <div className="flex flex-col px-4 py-6 sm:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex animate-rise-in items-center justify-between">
           <Link href="/" aria-label="Meridian home" className="w-fit rounded-lg outline-none">
             <MeridianLogo markSize={26} />
           </Link>
           <ThemeToggle />
         </div>
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">
+        <div
+          className="mx-auto flex w-full max-w-sm flex-1 animate-rise-in flex-col justify-center py-12"
+          style={{ animationDelay: "0.08s" }}
+        >
           <h1 className="font-display text-[32px] leading-[1.15] font-semibold tracking-tight text-balance">{title}</h1>
           <div className="mt-2.5 text-[15px] text-ink-2">{subtitle}</div>
           <div className="mt-8">{children}</div>
         </div>
-        <p className="mx-auto w-full max-w-sm font-mono text-xs text-ink-3">
+        <p
+          className="mx-auto w-full max-w-sm animate-rise-in font-mono text-xs text-ink-3"
+          style={{ animationDelay: "0.16s" }}
+        >
           Protected by session authentication · idle expiry 24h
         </p>
       </div>
@@ -46,7 +52,7 @@ export function AuthLayout({
       >
         <div aria-hidden="true" className="texture-dots pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(ellipse_60%_50%_at_70%_30%,black,transparent)]" />
         <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-sage" />
-        <div className="relative">
+        <div className="relative animate-rise-in" style={{ animationDelay: "0.12s" }}>
           <MeridianMark size={44} className="text-accent" />
           <p className="font-display mt-8 max-w-md text-[34px] leading-[1.12] font-semibold tracking-tight text-balance">
             Clarity for complex engineering.
@@ -57,7 +63,11 @@ export function AuthLayout({
         </div>
         <dl className="relative flex flex-col">
           {PANEL_POINTS.map(([term, definition], i) => (
-            <div key={term} className="flex max-w-md gap-4 border-t border-line/70 py-5 last:border-b">
+            <div
+              key={term}
+              className="flex max-w-md animate-rise-in gap-4 border-t border-line/70 py-5 last:border-b"
+              style={{ animationDelay: `${0.2 + i * 0.08}s` }}
+            >
               <span aria-hidden="true" className="font-display tnum text-lg font-semibold text-sage">
                 {String(i + 1).padStart(2, "0")}
               </span>
@@ -68,7 +78,7 @@ export function AuthLayout({
             </div>
           ))}
         </dl>
-        <p className="relative font-mono text-xs text-ink-3">meridian · milestone 2 · session auth</p>
+        <p className="relative animate-rise-in font-mono text-xs text-ink-3" style={{ animationDelay: "0.45s" }}>meridian · milestone 2 · session auth</p>
       </aside>
     </div>
   );

@@ -38,7 +38,7 @@ export function Alert({
 }) {
   const Glyph = Icon[tone];
   return (
-    <div role="alert" className={cn("flex gap-3 rounded-xl border px-4 py-3.5 shadow-card", toneClass[tone], className)}>
+    <div role="alert" className={cn("flex animate-alert-in gap-3 rounded-xl border px-4 py-3.5 shadow-card", toneClass[tone], className)}>
       <span aria-hidden="true" className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", iconTone[tone])}>
         <Glyph className="size-4" />
       </span>

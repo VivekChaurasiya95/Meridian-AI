@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderKanban, LayoutDashboard, FileText, FlaskConical, Settings } from "lucide-react";
+import { FolderKanban, LayoutDashboard, FileText, FlaskConical, Layers, Settings } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/Badge";
 
@@ -16,8 +16,9 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/app", label: "Overview", icon: LayoutDashboard, available: true },
-  { href: "/app/projects", label: "Projects", icon: FolderKanban, available: false, milestone: "M3" },
-  { href: "/app/investigations", label: "Investigations", icon: FlaskConical, available: false, milestone: "M4" },
+  { href: "/app/projects", label: "Projects", icon: FolderKanban, available: true },
+  { href: "/app/jobs", label: "Jobs", icon: Layers, available: true },
+  { href: "/app/investigations", label: "Investigations", icon: FlaskConical, available: false, milestone: "M5" },
   { href: "/app/reports", label: "Reports", icon: FileText, available: false, milestone: "M10" },
   { href: "/app/settings", label: "Settings", icon: Settings, available: false, milestone: "M2" },
 ];
@@ -68,9 +69,9 @@ export function Sidebar() {
       })}
       <div className="mt-auto px-1 pt-4">
         <div className="rounded-xl border border-line/70 bg-surface-1 p-3.5 shadow-card">
-          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-sage uppercase">Milestone 2</p>
+          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-sage uppercase">Milestone 5.1</p>
           <p className="mt-1 text-xs leading-5 text-ink-2">
-            Auth & workspaces live. Unbuilt areas are marked, never faked.
+            Auth, workspaces, projects, jobs & stored snapshots live. Unbuilt areas are marked, never faked.
           </p>
         </div>
       </div>

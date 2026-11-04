@@ -3,9 +3,18 @@
 import type {
   AssignableRole,
   ErrorDetail,
+  FilePreview,
   HealthChecks,
+  Job,
+  JobStage,
   Member,
   PageInfo,
+  Project,
+  ProjectsSummary,
+  SnapshotDetail,
+  SnapshotSummary,
+  TreeListing,
+  UploadResult,
   User,
   Workspace,
 } from "./types";
@@ -220,6 +229,236 @@ export async function removeMember(workspaceId: string, userId: string): Promise
   await apiFetch<null>(`/api/v1/workspaces/${workspaceId}/members/${userId}`, {
     method: "DELETE",
   });
+}
+
+export type ProjectSort = "updated" | "created" | "name";
+export type ProjectStatusFilter = "active" | "archived";
+
+export async function listProjects(
+  workspaceId: string,
+  options?: {
+    limit?: number;
+    cursor?: string | null;
+    status?: ProjectStatusFilter | null;
+    q?: string | null;
+    sort?: ProjectSort;
+  },
+): Promise<{ items: Project[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.status) params.set("status", options.status);
+  if (options?.q) params.set("q", options.q);
+  if (options?.sort) params.set("sort", options.sort);
+  const { data, page } = await apiFetch<Project[]>(
+    `/api/v1/workspaces/${workspaceId}/projects?${params}`,
+  );
+  return { items: data, page: page ?? { limit: 25, next_cursor: null } };
+}
+
+export async function getProjectsSummary(workspaceId: string): Promise<ProjectsSummary> {
+  const { data } = await apiFetch<ProjectsSummary>(
+    `/api/v1/workspaces/${workspaceId}/projects/summary`,
+  );
+  return data;
+}
+
+export async function createProject(
+  workspaceId: string,
+  input: { name: string; slug: string; description?: string | null },
+): Promise<Project> {
+  const { data } = await apiFetch<Project>(`/api/v1/workspaces/${workspaceId}/projects`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function getProject(id: string): Promise<Project> {
+  const { data } = await apiFetch<Project>(`/api/v1/projects/${id}`);
+  return data;
+}
+
+export async function updateProject(
+  id: string,
+  input: { name: string; description?: string | null },
+): Promise<Project> {
+  const { data } = await apiFetch<Project>(`/api/v1/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function archiveProject(id: string): Promise<Project> {
+  const { data } = await apiFetch<Project>(`/api/v1/projects/${id}/archive`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await apiFetch<null>(`/api/v1/projects/${id}`, { method: "DELETE" });
+}
+
+export async function unarchiveProject(id: string): Promise<Project> {
+  const { data } = await apiFetch<Project>(`/api/v1/projects/${id}/unarchive`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function listSnapshots(
+  projectId: string,
+  limit = 25,
+  cursor?: string | null,
+): Promise<{ items: SnapshotSummary[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  const { data, page } = await apiFetch<SnapshotSummary[]>(
+    `/api/v1/projects/${projectId}/snapshots?${params}`,
+  );
+  return { items: data, page: page ?? { limit, next_cursor: null } };
+}
+
+export async function getSnapshot(id: string): Promise<SnapshotDetail> {
+  const { data } = await apiFetch<SnapshotDetail>(`/api/v1/snapshots/${id}`);
+  return data;
+}
+
+export async function getTree(
+  snapshotId: string,
+  prefix = "",
+  limit = 500,
+  offset = 0,
+): Promise<TreeListing> {
+  const params = new URLSearchParams({
+    prefix,
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const { data } = await apiFetch<TreeListing>(`/api/v1/snapshots/${snapshotId}/tree?${params}`);
+  return data;
+}
+
+export async function getFilePreview(snapshotId: string, path: string): Promise<FilePreview> {
+  const params = new URLSearchParams({ path });
+  const { data } = await apiFetch<FilePreview>(`/api/v1/snapshots/${snapshotId}/file?${params}`);
+  return data;
+}
+
+/**
+ * Upload a ZIP archive with real progress events. Uses XMLHttpRequest
+ * because fetch cannot report upload progress. Rejects with
+ * MeridianApiError carrying the backend code (ARCHIVE_* / INVALID_STATE).
+ */
+export function uploadProjectArchive(
+  projectId: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal | null,
+): Promise<UploadResult> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const form = new FormData();
+    form.append("file", file, file.name);
+    if (signal?.aborted) {
+      reject(new MeridianApiError(0, "UPLOAD_CANCELLED", "The upload was cancelled."));
+      return;
+    }
+    const onAbort = () => xhr.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress?.(event.loaded / event.total);
+    });
+    xhr.addEventListener("load", () => {
+      signal?.removeEventListener("abort", onAbort);
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        body = null;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const err = (body as { error?: { code?: string; message?: string } })?.error;
+        reject(
+          new MeridianApiError(
+            xhr.status,
+            err?.code ?? "UPLOAD_FAILED",
+            err?.message ?? `Upload failed with status ${xhr.status}.`,
+          ),
+        );
+        return;
+      }
+      resolve((body as { data: UploadResult }).data);
+    });
+    xhr.addEventListener("error", () => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(new MeridianApiError(0, "API_UNREACHABLE", "The Meridian API is unreachable."));
+    });
+    xhr.addEventListener("abort", () => {
+      signal?.removeEventListener("abort", onAbort);
+      reject(new MeridianApiError(0, "UPLOAD_CANCELLED", "The upload was cancelled."));
+    });
+    xhr.open("POST", `${apiBase()}/api/v1/projects/${projectId}/source-uploads`);
+    xhr.withCredentials = true;
+    xhr.send(form);
+  });
+}
+
+export async function submitJob(
+  workspaceId: string,
+  input: {
+    job_type: "lifecycle_test" | "manifest_recheck";
+    payload?: Record<string, unknown>;
+    idempotency_key?: string;
+  },
+): Promise<Job> {
+  const { data } = await apiFetch<Job>(`/api/v1/workspaces/${workspaceId}/jobs`, {
+    method: "POST",
+    body: JSON.stringify({ payload: {}, ...input }),
+  });
+  return data;
+}
+
+export async function listJobs(
+  workspaceId: string,
+  options?: { limit?: number; cursor?: string | null; status?: string | null },
+): Promise<{ items: Job[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.status) params.set("status", options.status);
+  const { data, page } = await apiFetch<Job[]>(
+    `/api/v1/workspaces/${workspaceId}/jobs?${params}`,
+  );
+  return { items: data, page: page ?? { limit: 25, next_cursor: null } };
+}
+
+export async function getJob(id: string): Promise<Job> {
+  const { data } = await apiFetch<Job>(`/api/v1/jobs/${id}`);
+  return data;
+}
+
+export async function cancelJob(id: string): Promise<Job> {
+  const { data } = await apiFetch<Job>(`/api/v1/jobs/${id}/cancel`, { method: "POST" });
+  return data;
+}
+
+export async function getJobStages(id: string): Promise<JobStage[]> {
+  const { data } = await apiFetch<{ stages: JobStage[] }>(`/api/v1/jobs/${id}/stages`);
+  return data.stages;
+}
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`;
 }
 
 export function formatTimestamp(iso: string): string {

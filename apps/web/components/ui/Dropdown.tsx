@@ -24,7 +24,7 @@ export function Dropdown({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild aria-label={label}>
-        <button type="button" className="flex items-center gap-2 rounded-[10px] outline-none">
+        <button type="button" className="group flex items-center gap-2 rounded-[10px] outline-none">
           {trigger}
         </button>
       </DropdownMenu.Trigger>
