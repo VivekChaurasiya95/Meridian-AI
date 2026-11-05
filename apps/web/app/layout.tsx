@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/components/auth/AuthContext";
+import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import "./globals.css";
 
@@ -46,7 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem={false}
           disableTransitionOnChange
         >
-          <AuthProvider>{children}</AuthProvider>
+          <ToastProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

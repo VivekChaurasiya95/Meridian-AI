@@ -543,6 +543,71 @@ export interface Report {
   created_at: string;
 }
 
+export type SecurityAssessmentStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "review_required"
+  | "partial"
+  | "failed"
+  | "cancelled";
+
+export interface SecurityAssessmentSummary {
+  total: number;
+  by_severity: Record<string, number>;
+}
+
+export interface SecurityAssessment {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  snapshot_id: string;
+  job_id: string | null;
+  generation: number;
+  status: SecurityAssessmentStatus;
+  policy_version: string;
+  summary: SecurityAssessmentSummary;
+  scanner_versions: Record<string, string>;
+  ruleset_version: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export type SecurityFindingSeverity = "critical" | "high" | "medium" | "low" | "informational";
+
+export type SecurityFindingScanner = "semgrep" | "gitleaks";
+
+export type SecurityFindingConfidence = "high" | "medium" | "low";
+
+export interface SecurityFindingLocation {
+  path: string;
+  start_line: number | null;
+  end_line: number | null;
+}
+
+export interface SecurityFindingEvidence {
+  excerpt: string | null;
+  redacted: boolean;
+  truncated: boolean;
+}
+
+export interface SecurityFinding {
+  id: string;
+  assessment_id: string;
+  fingerprint: string;
+  scanner: SecurityFindingScanner;
+  rule_id: string;
+  severity: SecurityFindingSeverity;
+  confidence: SecurityFindingConfidence;
+  category: string;
+  title: string;
+  description: string;
+  location: SecurityFindingLocation;
+  evidence: SecurityFindingEvidence;
+  created_at: string;
+}
+
 export type ExecutionStatus = "running" | "completed" | "failed" | "timed_out" | "cancelled";
 
 export interface SandboxExecution {

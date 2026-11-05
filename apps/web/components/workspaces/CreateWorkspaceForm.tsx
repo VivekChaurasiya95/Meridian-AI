@@ -6,6 +6,7 @@ import type { Workspace } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
+import { useToast } from "@/components/ui/Toast";
 import { Card, CardContent, CardDescription, CardEyebrow, CardHeader, CardTitle } from "@/components/ui/Card";
 
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -20,6 +21,7 @@ function suggestSlug(name: string): string {
 }
 
 export function CreateWorkspaceForm({ onCreated }: { onCreated: (workspace: Workspace) => void }) {
+  const toast = useToast();
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -46,6 +48,7 @@ export function CreateWorkspaceForm({ onCreated }: { onCreated: (workspace: Work
     try {
       const workspace = await createWorkspace({ name: name.trim(), slug });
       onCreated(workspace);
+      toast.success(`Workspace “${workspace.name}” created.`);
       setName("");
       setSlug("");
       setSlugTouched(false);

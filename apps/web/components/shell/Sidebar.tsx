@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
   { href: "/app/jobs", label: "Jobs", icon: Layers, available: true },
   { href: "/app/investigations", label: "Investigations", icon: FlaskConical, available: true },
   { href: "/app/reports", label: "Reports", icon: FileText, available: true },
-  { href: "/app/settings", label: "Settings", icon: Settings, available: false, milestone: "M2" },
+  { href: "/app/settings", label: "Settings", icon: Settings, available: true },
 ];
 
 export function Sidebar() {
@@ -69,9 +69,9 @@ export function Sidebar() {
       })}
       <div className="mt-auto px-1 pt-4">
         <div className="rounded-xl border border-line/70 bg-surface-1 p-3.5 shadow-card">
-          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-sage uppercase">Milestone 5.1</p>
+          <p className="font-mono text-[11px] font-medium tracking-[0.12em] text-sage uppercase">Meridian</p>
           <p className="mt-1 text-xs leading-5 text-ink-2">
-            Auth, workspaces, projects, jobs & stored snapshots live. Unbuilt areas are marked, never faked.
+            Workspaces, projects, investigations, verification, patches, reports & assessments live.
           </p>
         </div>
       </div>

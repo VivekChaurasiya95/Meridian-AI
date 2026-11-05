@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -70,6 +71,7 @@ export function MembersCard({
   canManage: boolean;
   currentUserId: string;
 }) {
+  const toast = useToast();
   const [members, setMembers] = React.useState<Member[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [email, setEmail] = React.useState("");
@@ -100,6 +102,7 @@ export function MembersCard({
     try {
       const member = await addMember(workspaceId, { email: email.trim(), role });
       setMembers((current) => (current ? [...current, member] : [member]));
+      toast.success(`${member.email ?? "Member"} added as ${member.role}.`);
       setEmail("");
     } catch (err) {
       if (err instanceof MeridianApiError && err.status === 404) {
@@ -122,6 +125,7 @@ export function MembersCard({
       setMembers((current) =>
         current ? current.map((m) => (m.user_id === member.user_id ? updated : m)) : current,
       );
+      toast.success(`${member.display_name ?? member.email ?? "Member"} is now ${nextRole}.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change the role.");
     } finally {

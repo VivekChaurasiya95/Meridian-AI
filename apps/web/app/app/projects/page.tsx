@@ -170,13 +170,12 @@ function ProjectRow({
             />
           </Link>
           <span className="flex shrink-0 items-center gap-2 pl-14 sm:pl-0">
-            <span
-              title="Investigations arrive in M4"
-              className="inline-flex h-8 cursor-not-allowed items-center rounded-md border border-line/60 px-2.5 text-[13px] font-medium text-ink-3 opacity-60"
-              aria-disabled="true"
+            <Link
+              href={`/app/projects/${project.id}?tab=investigations`}
+              className="inline-flex h-8 items-center rounded-md border border-line bg-surface-1 px-2.5 text-[13px] font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
             >
               New investigation
-            </span>
+            </Link>
             <Dropdown
               label={`Actions for ${project.name}`}
               trigger={

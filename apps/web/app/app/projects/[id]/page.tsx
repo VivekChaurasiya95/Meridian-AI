@@ -49,6 +49,9 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { SecurityTab } from "@/components/security/SecurityTab";
+import { SnapshotAssessment } from "@/components/security/SnapshotAssessment";
 import { cn } from "@/lib/cn";
 
 type LoadState =
@@ -57,7 +60,7 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; project: Project };
 
-const TABS = ["overview", "repository", "snapshots", "investigations", "settings"] as const;
+const TABS = ["overview", "repository", "snapshots", "investigations", "security", "settings"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -193,16 +196,15 @@ function OverviewTab({ project }: { project: Project }) {
           </CardHeader>
           <CardContent>
             <p className="text-[13px] text-ink-2">
-              Investigations arrive in M4. Snapshots created here will pin their source state.
+              Open a case against a stored snapshot to reproduce, evidence, and fix a bug.
             </p>
             <div className="mt-3">
-              <span
-                title="Investigations arrive in M4"
-                aria-disabled="true"
-                className="inline-flex h-9 cursor-not-allowed items-center rounded-[10px] border border-line/60 px-4 text-sm font-medium text-ink-3 opacity-60"
+              <Link
+                href={`/app/projects/${project.id}?tab=investigations`}
+                className="inline-flex h-9 items-center rounded-[10px] border border-line bg-surface-1 px-4 text-sm font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
               >
                 New investigation
-              </span>
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -579,6 +581,14 @@ function SnapshotsTab({ project }: { project: Project }) {
                         {warning}
                       </p>
                     ))}
+                  </div>
+                )}
+                {!detailLoading && (
+                  <div className="mt-4 border-t border-line/60 pt-3">
+                    <p className="mb-2 font-mono text-[11px] tracking-[0.12em] text-ink-3 uppercase">
+                      Assessment
+                    </p>
+                    <SnapshotAssessment snapshotId={snapshot.id} />
                   </div>
                 )}
               </div>
@@ -1283,13 +1293,9 @@ export default function ProjectDetailPage() {
             </span>
           )}
           <span className="ml-auto flex items-center gap-2">
-            <span
-              title="Investigations arrive in M4"
-              aria-disabled="true"
-              className="inline-flex h-9 cursor-not-allowed items-center rounded-[10px] border border-line/60 px-4 text-sm font-medium text-ink-3 opacity-60"
-            >
+            <Button size="sm" onClick={() => setTab("investigations")}>
               New investigation
-            </span>
+            </Button>
             <Button size="sm" variant="secondary" onClick={() => setTab("settings")}>
               Project settings
             </Button>
@@ -1327,6 +1333,7 @@ export default function ProjectDetailPage() {
         {activeTab === "repository" && <RepositoryTab project={project} />}
         {activeTab === "snapshots" && <SnapshotsTab project={project} />}
         {activeTab === "investigations" && <InvestigationsTab project={project} />}
+        {activeTab === "security" && <SecurityTab projectId={project.id} />}
         {activeTab === "settings" && (
           <SettingsTab
             project={project}

@@ -29,6 +29,10 @@ import type {
   Report,
   ReportFormat,
   SandboxExecution,
+  SecurityAssessment,
+  SecurityFinding,
+  SecurityFindingScanner,
+  SecurityFindingSeverity,
   SnapshotDetail,
   SnapshotSummary,
   TreeListing,
@@ -770,6 +774,55 @@ export async function issueEvidenceDownload(id: string): Promise<DownloadUrl> {
     method: "POST",
   });
   return data;
+}
+
+export async function listProjectAssessments(
+  projectId: string,
+  options?: { limit?: number; cursor?: string | null },
+): Promise<{ items: SecurityAssessment[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const { data, page } = await apiFetch<SecurityAssessment[]>(
+    `/api/v1/projects/${projectId}/security-assessments?${params}`,
+  );
+  return { items: data, page: page ?? { limit: 25, next_cursor: null } };
+}
+
+export async function getSnapshotAssessment(snapshotId: string): Promise<SecurityAssessment> {
+  const { data } = await apiFetch<SecurityAssessment>(
+    `/api/v1/snapshots/${snapshotId}/security-assessment`,
+  );
+  return data;
+}
+
+export async function getSecurityAssessment(assessmentId: string): Promise<SecurityAssessment> {
+  const { data } = await apiFetch<SecurityAssessment>(
+    `/api/v1/security-assessments/${assessmentId}`,
+  );
+  return data;
+}
+
+export async function listAssessmentFindings(
+  assessmentId: string,
+  options?: {
+    limit?: number;
+    cursor?: string | null;
+    severity?: SecurityFindingSeverity | null;
+    scanner?: SecurityFindingScanner | null;
+    category?: string | null;
+    pathPrefix?: string | null;
+  },
+): Promise<{ items: SecurityFinding[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.severity) params.set("severity", options.severity);
+  if (options?.scanner) params.set("scanner", options.scanner);
+  if (options?.category) params.set("category", options.category);
+  if (options?.pathPrefix) params.set("path_prefix", options.pathPrefix);
+  const { data, page } = await apiFetch<SecurityFinding[]>(
+    `/api/v1/security-assessments/${assessmentId}/findings?${params}`,
+  );
+  return { items: data, page: page ?? { limit: 25, next_cursor: null } };
 }
 
 export function formatBytes(bytes: number): string {
