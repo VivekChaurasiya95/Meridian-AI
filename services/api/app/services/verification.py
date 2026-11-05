@@ -467,9 +467,7 @@ def adopt_queued_run(
     return {"run_id": row.id, "selected_check_keys": selected, "planned_total": planned_total}
 
 
-def comparison(
-    session: Session, user: User, investigation_id: uuid.UUID, limit: int = 25
-) -> dict:
+def comparison(session: Session, user: User, investigation_id: uuid.UUID, limit: int = 25) -> dict:
     """Baseline-vs-post-patch results per regression test (M9, capped)."""
     inv, _role = investigation_access(session, user, investigation_id)
     tests = list(

@@ -250,8 +250,11 @@ def download_security_object(
         shutil.rmtree(workdir, ignore_errors=True)
         if exc.code == "OBJECT_NOT_FOUND":
             _mark_security_failed(
-                session, snapshot, "integrity_failed",
-                "OBJECT_NOT_FOUND", "The stored security object is missing.",
+                session,
+                snapshot,
+                "integrity_failed",
+                "OBJECT_NOT_FOUND",
+                "The stored security object is missing.",
             )
             raise ApiError(
                 409, "SNAPSHOT_NOT_READY", "The stored security object is missing."
@@ -261,8 +264,11 @@ def download_security_object(
     if expected != snapshot.security_content_digest:
         shutil.rmtree(workdir, ignore_errors=True)
         _mark_security_failed(
-            session, snapshot, "integrity_failed",
-            "DIGEST_MISMATCH", "The security key disagrees with the recorded digest.",
+            session,
+            snapshot,
+            "integrity_failed",
+            "DIGEST_MISMATCH",
+            "The security key disagrees with the recorded digest.",
         )
         raise ApiError(
             422, "INTEGRITY_FAILED", "The security key disagrees with the recorded digest."
@@ -271,8 +277,11 @@ def download_security_object(
     if actual != expected or os.path.getsize(tmp_path) != snapshot.security_storage_bytes:
         shutil.rmtree(workdir, ignore_errors=True)
         _mark_security_failed(
-            session, snapshot, "integrity_failed",
-            "DIGEST_MISMATCH", "Stored security bytes differ from the recorded digest.",
+            session,
+            snapshot,
+            "integrity_failed",
+            "DIGEST_MISMATCH",
+            "Stored security bytes differ from the recorded digest.",
         )
         raise ApiError(
             422, "INTEGRITY_FAILED", "Stored security bytes differ from the recorded digest."
@@ -322,8 +331,11 @@ def materialize_security_input_for_workspace(
                 members = probe.getmembers()
         except (tarfile.TarError, EOFError, OSError):
             _mark_security_failed(
-                session, snapshot, "integrity_failed",
-                "TARBALL_CORRUPT", "The stored security object is not a valid archive.",
+                session,
+                snapshot,
+                "integrity_failed",
+                "TARBALL_CORRUPT",
+                "The stored security object is not a valid archive.",
             )
             raise ApiError(
                 422, "INTEGRITY_FAILED", "The stored security object is not a valid archive."
@@ -381,7 +393,8 @@ def materialize_security_input_for_workspace(
             under_skipped = any(part in SKIP_DIRS for part in rel.split("/")[:-1])
             if under_skipped or not is_secret_file(basename):
                 raise ApiError(
-                    422, "INTEGRITY_FAILED",
+                    422,
+                    "INTEGRITY_FAILED",
                     "The stored security archive has an unexpected entry.",
                 )
         for rel in indexed_paths:

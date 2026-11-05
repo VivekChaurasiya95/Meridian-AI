@@ -56,9 +56,7 @@ def test_semgrep_empty_results_is_clean_completion() -> None:
 
 
 def test_semgrep_errors_counted_not_failed() -> None:
-    result = semgrep.parse(
-        0, _semgrep_doc([], [{"code": 1}]), b"", truncated=False
-    )
+    result = semgrep.parse(0, _semgrep_doc([], [{"code": 1}]), b"", truncated=False)
     assert result.errors_count == 1
 
 

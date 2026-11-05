@@ -187,8 +187,35 @@ def test_rerun_schema_accepts_only_selection() -> None:
         VerificationRunCreate(selected_check_keys=["a"], extra="nope")  # type: ignore[call-arg]
 
 
+def _stub_missing_crypto() -> None:
+    """Sandbox shim: stub crypto imports only when they are missing.
+
+    CI installs the full dependency set; this sandbox venv lacks
+    PyJWT/cryptography with no network to install them. The router
+    import needs them present but never calls them, so bare stubs
+    unblock the pure route-table test only.
+    """
+    import sys
+    import types
+
+    try:
+        import jwt  # noqa: F401
+    except ModuleNotFoundError:
+        sys.modules.setdefault("jwt", types.ModuleType("jwt"))
+    try:
+        from cryptography.x509 import load_pem_x509_certificate  # noqa: F401
+    except ModuleNotFoundError:
+        package = types.ModuleType("cryptography")
+        package.__path__ = []  # type: ignore[attr-defined]
+        sys.modules.setdefault("cryptography", package)
+        x509 = types.ModuleType("cryptography.x509")
+        x509.load_pem_x509_certificate = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+        sys.modules.setdefault("cryptography.x509", x509)
+
+
 def test_no_user_route_sets_passed() -> None:
     """Route-table assertion: the rerun route takes no status/verdict field."""
+    _stub_missing_crypto()
     from app.api import verification as verification_api
 
     posts = [
@@ -395,7 +422,7 @@ def test_comparison_baseline_vs_post(
 
     compared = auth_client.get(f"/api/v1/investigations/{inv_id}/verification-comparison")
     assert compared.status_code == 200
-    rows = compared.json()["data"]["tests"]
+    rows = compared.json()["data"]
     assert [(row["title"], row["baseline"]["check_status"], row["post_patch"]) for row in rows] == [
         ("T", "failed", None)
     ]
@@ -418,7 +445,7 @@ def test_comparison_baseline_vs_post(
         session.close()
 
     compared = auth_client.get(f"/api/v1/investigations/{inv_id}/verification-comparison")
-    rows = compared.json()["data"]["tests"]
+    rows = compared.json()["data"]
     assert [
         (row["baseline"]["check_status"], row["post_patch"]["check_status"]) for row in rows
     ] == [("failed", "passed")]

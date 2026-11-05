@@ -93,9 +93,7 @@ def get_or_create_assessment(
     so one job never leaves two assessments behind.
     """
     row = (
-        session.execute(
-            select(SecurityAssessment).where(SecurityAssessment.job_id == job_id)
-        )
+        session.execute(select(SecurityAssessment).where(SecurityAssessment.job_id == job_id))
     ).scalar_one_or_none()
     if row is not None:
         row.status = "running"
@@ -103,9 +101,7 @@ def get_or_create_assessment(
         row.completed_at = None
         row.summary = {}
         row.scanner_versions = {}
-        session.execute(
-            delete(SecurityFinding).where(SecurityFinding.assessment_id == row.id)
-        )
+        session.execute(delete(SecurityFinding).where(SecurityFinding.assessment_id == row.id))
         session.commit()
         session.refresh(row)
         return row
@@ -171,9 +167,7 @@ def store_assessment_result(
     row = session.get(SecurityAssessment, assessment_id)
     if row is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "The assessment was not found.")
-    session.execute(
-        delete(SecurityFinding).where(SecurityFinding.assessment_id == assessment_id)
-    )
+    session.execute(delete(SecurityFinding).where(SecurityFinding.assessment_id == assessment_id))
     for record in records:
         session.add(SecurityFinding(assessment_id=assessment_id, **record))
     row.status = status
@@ -218,9 +212,7 @@ def get_assessment(session: Session, user: User, assessment_id: uuid.UUID) -> di
     return serialize_assessment(_assessment_for_user(session, user, assessment_id))
 
 
-def get_snapshot_assessment(
-    session: Session, user: User, snapshot_id: uuid.UUID
-) -> dict:
+def get_snapshot_assessment(session: Session, user: User, snapshot_id: uuid.UUID) -> dict:
     """Latest assessment generation for one snapshot (404 when none)."""
     from app.models import WorkspaceMember
 

@@ -258,6 +258,45 @@ def test_audit_list_restricted(auth_client_factory) -> None:  # type: ignore[no-
     assert outsider.get(f"/api/v1/workspaces/{workspace['id']}/audit-events").status_code == 404
 
 
+def _stub_missing_crypto() -> None:
+    """Sandbox shim: stub crypto imports only when they are missing.
+
+    CI installs the full dependency set; this sandbox venv lacks
+    PyJWT/cryptography with no network to install them. The router
+    import needs them present but never calls them, so bare stubs
+    unblock the pure route-table test only.
+    """
+    import sys
+    import types
+
+    try:
+        import jwt  # noqa: F401
+    except ModuleNotFoundError:
+        sys.modules.setdefault("jwt", types.ModuleType("jwt"))
+    try:
+        from cryptography.x509 import load_pem_x509_certificate  # noqa: F401
+    except ModuleNotFoundError:
+        package = types.ModuleType("cryptography")
+        package.__path__ = []  # type: ignore[attr-defined]
+        sys.modules.setdefault("cryptography", package)
+        x509 = types.ModuleType("cryptography.x509")
+        x509.load_pem_x509_certificate = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+        sys.modules.setdefault("cryptography.x509", x509)
+
+
+def test_workspace_investigations_route_present() -> None:
+    """Route-table assertion: the M8 workspace index route exists exactly once."""
+    _stub_missing_crypto()
+    from app.api import investigations as investigations_api
+
+    found = sorted(
+        (sorted(getattr(route, "methods", set())), route.path)
+        for route in investigations_api.router.routes
+        if getattr(route, "path", "") == "/api/v1/workspaces/{workspace_id}/investigations"
+    )
+    assert found == [(["GET"], "/api/v1/workspaces/{workspace_id}/investigations")]
+
+
 def test_terminal_transition_refused(auth_client: TestClient, db_session_factory) -> None:  # type: ignore[no-untyped-def]
     _, project, snapshot = setup(auth_client, "c9")
     inv = create(auth_client, project["id"], snapshot["id"]).json()["data"]
@@ -293,3 +332,79 @@ def test_terminal_transition_refused(auth_client: TestClient, db_session_factory
         assert exc.value.code == "INVALID_TRANSITION"
     finally:
         session.close()
+
+
+def test_workspace_list_scope_and_order(auth_client_factory) -> None:  # type: ignore[no-untyped-def]
+    owner = auth_client_factory("owner-winv@example.com")
+    workspace, project_a, snapshot_a = setup(owner, "w1")
+    project_b = make_project(owner, workspace["id"], "pw1b")
+    snapshot_b = upload_snapshot(owner, project_b["id"])
+    first = create(owner, project_a["id"], snapshot_a["id"], title="First").json()["data"]
+    second = create(owner, project_b["id"], snapshot_b["id"], title="Second").json()["data"]
+    third = create(owner, project_a["id"], snapshot_a["id"], title="Third").json()["data"]
+    # A second workspace is invisible here: scope, not a global list.
+    _, other_project, other_snapshot = setup(owner, "w1other")
+    other = create(owner, other_project["id"], other_snapshot["id"]).json()["data"]
+
+    listed = owner.get(f"/api/v1/workspaces/{workspace['id']}/investigations")
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    assert [item["id"] for item in body["data"]] == [third["id"], second["id"], first["id"]]
+    assert {item["project_id"] for item in body["data"]} == {project_a["id"], project_b["id"]}
+    assert other["id"] not in [item["id"] for item in body["data"]]
+    assert body["page"]["limit"] == 25
+    assert body["page"]["next_cursor"] is None
+
+
+def test_workspace_list_authz(auth_client_factory) -> None:  # type: ignore[no-untyped-def]
+    owner = auth_client_factory("owner-winv2@example.com")
+    viewer = auth_client_factory("viewer-winv2@example.com")
+    outsider = auth_client_factory("outsider-winv2@example.com")
+    workspace, project, snapshot = setup(owner, "w2")
+    inv = create(owner, project["id"], snapshot["id"]).json()["data"]
+    added = owner.post(
+        f"/api/v1/workspaces/{workspace['id']}/members",
+        json={"email": "viewer-winv2@example.com", "role": "viewer"},
+    )
+    assert added.status_code == 201, added.text
+    seen = viewer.get(f"/api/v1/workspaces/{workspace['id']}/investigations")
+    assert seen.status_code == 200, seen.text
+    assert [item["id"] for item in seen.json()["data"]] == [inv["id"]]
+    assert outsider.get(f"/api/v1/workspaces/{workspace['id']}/investigations").status_code == 404
+    assert owner.get(f"/api/v1/workspaces/{uuid.uuid4()}/investigations").status_code == 404
+
+
+def test_workspace_list_pagination(auth_client: TestClient) -> None:
+    workspace, project, snapshot = setup(auth_client, "w3")
+    ids = [
+        create(auth_client, project["id"], snapshot["id"], title=f"T{i}").json()["data"]["id"]
+        for i in range(3)
+    ]
+    first = auth_client.get(
+        f"/api/v1/workspaces/{workspace['id']}/investigations", params={"limit": 2}
+    )
+    assert first.status_code == 200, first.text
+    page_one = first.json()
+    assert [item["id"] for item in page_one["data"]] == [ids[2], ids[1]]
+    assert page_one["page"]["limit"] == 2
+    cursor = page_one["page"]["next_cursor"]
+    assert cursor
+    second = auth_client.get(
+        f"/api/v1/workspaces/{workspace['id']}/investigations",
+        params={"limit": 2, "cursor": cursor},
+    )
+    assert second.status_code == 200, second.text
+    assert [item["id"] for item in second.json()["data"]] == [ids[0]]
+    assert second.json()["page"]["next_cursor"] is None
+    assert (
+        auth_client.get(
+            f"/api/v1/workspaces/{workspace['id']}/investigations", params={"limit": 101}
+        ).status_code
+        == 422
+    )
+    assert (
+        auth_client.get(
+            f"/api/v1/workspaces/{workspace['id']}/investigations", params={"cursor": "bogus"}
+        ).status_code
+        == 422
+    )

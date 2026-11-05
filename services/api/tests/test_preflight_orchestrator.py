@@ -227,23 +227,17 @@ def _sandboxes() -> set:
 
 
 def _sem_container() -> FakeContainer:
-    return FakeContainer(
-        exit_code=0, exit_after=2, logs_out=json.dumps(SEMGREP_DOC).encode()
-    )
+    return FakeContainer(exit_code=0, exit_after=2, logs_out=json.dumps(SEMGREP_DOC).encode())
 
 
 def _leak_container() -> FakeContainer:
-    return FakeContainer(
-        exit_code=1, exit_after=2, logs_out=json.dumps(GITLEAKS_DOC).encode()
-    )
+    return FakeContainer(exit_code=1, exit_after=2, logs_out=json.dumps(GITLEAKS_DOC).encode())
 
 
 def _exec_rows(db_session: Session, job_id: str):  # type: ignore[no-untyped-def]
     return (
         db_session.execute(
-            select(SandboxExecution).where(
-                SandboxExecution.job_id == uuid.UUID(job_id)
-            )
+            select(SandboxExecution).where(SandboxExecution.job_id == uuid.UUID(job_id))
         )
         .scalars()
         .all()
@@ -260,9 +254,7 @@ def test_full_run_completes_and_persists(
     claimed = _claim(db_session)
     before = _sandboxes()
     client = FakeClient([_sem_container(), _leak_container()])
-    result = run_preflight(
-        db_session_factory, claimed, "w-pre", client=client, store=fake_store
-    )
+    result = run_preflight(db_session_factory, claimed, "w-pre", client=client, store=fake_store)
 
     assert result["status"] == "review_required"
     assert result["snapshot_id"] == data["snapshot"]["id"]
@@ -280,9 +272,7 @@ def test_full_run_completes_and_persists(
 
     findings = (
         db_session.execute(
-            select(SecurityFinding).where(
-                SecurityFinding.assessment_id == assessment.id
-            )
+            select(SecurityFinding).where(SecurityFinding.assessment_id == assessment.id)
         )
         .scalars()
         .all()
@@ -377,9 +367,7 @@ def test_partial_when_one_scanner_fails(
     claimed = _claim(db_session)
     bad_leak = FakeContainer(exit_code=1, exit_after=1, logs_out=b"[oops")
     client = FakeClient([_sem_container(), bad_leak])
-    result = run_preflight(
-        db_session_factory, claimed, "w-pre", client=client, store=fake_store
-    )
+    result = run_preflight(db_session_factory, claimed, "w-pre", client=client, store=fake_store)
     assert result["status"] == "partial"
     assert result["summary"]["scanners"]["gitleaks"]["status"] == "failed"
     assert result["summary"]["scanners"]["gitleaks"]["error_code"] == "GITLEAKS_BAD_OUTPUT"
@@ -466,7 +454,11 @@ def test_cancel_marks_assessment_cancelled(
     client = FakeClient([_sem_container(), _leak_container()])
     with pytest.raises(PreflightFailure) as exc:
         run_preflight(
-            db_session_factory, claimed, "w-pre", client=client, store=fake_store,
+            db_session_factory,
+            claimed,
+            "w-pre",
+            client=client,
+            store=fake_store,
             is_cancelled=lambda: True,
         )
     assert exc.value.code == "EXECUTION_CANCELLED"
@@ -493,9 +485,7 @@ def test_finding_cap_keeps_highest_severity(
         preflight_module, "get_settings", lambda: SimpleNamespace(preflight_max_findings=1)
     )
     client = FakeClient([_sem_container(), _leak_container()])
-    result = run_preflight(
-        db_session_factory, claimed, "w-pre", client=client, store=fake_store
-    )
+    result = run_preflight(db_session_factory, claimed, "w-pre", client=client, store=fake_store)
     assert result["summary"]["persisted"] == 1
     assert result["summary"]["dropped"] == 1
     assert result["summary"]["total"] == 2
@@ -507,13 +497,23 @@ def test_run_scanner_rejects_unknown_scanner_and_bad_image(
 ) -> None:
     with pytest.raises(ScannerFailure):
         run_scanner(
-            db_session_factory, scanner="nmap", source_dir=str(tmp_path),
-            job_id=uuid.uuid4(), worker_id="w", snapshot_id=uuid.uuid4(), attempt=1,
+            db_session_factory,
+            scanner="nmap",
+            source_dir=str(tmp_path),
+            job_id=uuid.uuid4(),
+            worker_id="w",
+            snapshot_id=uuid.uuid4(),
+            attempt=1,
         )
     with pytest.raises(SandboxError) as exc:
         run_scanner(
-            db_session_factory, scanner="semgrep", source_dir=str(tmp_path),
-            job_id=uuid.uuid4(), worker_id="w", snapshot_id=uuid.uuid4(), attempt=1,
+            db_session_factory,
+            scanner="semgrep",
+            source_dir=str(tmp_path),
+            job_id=uuid.uuid4(),
+            worker_id="w",
+            snapshot_id=uuid.uuid4(),
+            attempt=1,
             image_override="evil:latest",
         )
     assert exc.value.code == "INVALID_PROFILE"
@@ -533,10 +533,15 @@ def test_run_scanner_timeout_is_retryable(
     client = FakeClient([container])
     with pytest.raises(ScannerFailure) as exc:
         run_scanner(
-            db_session_factory, scanner="gitleaks", source_dir=str(tmp_path),
-            job_id=uuid.UUID(claimed["id"]), worker_id="w",
-            snapshot_id=uuid.UUID(data["snapshot"]["id"]), attempt=1,
-            client=client, timeout_seconds=1,
+            db_session_factory,
+            scanner="gitleaks",
+            source_dir=str(tmp_path),
+            job_id=uuid.UUID(claimed["id"]),
+            worker_id="w",
+            snapshot_id=uuid.UUID(data["snapshot"]["id"]),
+            attempt=1,
+            client=client,
+            timeout_seconds=1,
         )
     assert exc.value.code == "COMMAND_TIMEOUT"
     assert exc.value.retryable

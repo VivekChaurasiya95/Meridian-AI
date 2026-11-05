@@ -43,18 +43,14 @@ def _failed(scanner: str) -> ScannerOutcome:
 
 
 def test_no_findings_completes_not_safe_claim() -> None:
-    status, summary = evaluate(
-        [], {"semgrep": _ok("semgrep"), "gitleaks": _ok("gitleaks")}
-    )
+    status, summary = evaluate([], {"semgrep": _ok("semgrep"), "gitleaks": _ok("gitleaks")})
     assert status == "completed"
     assert summary.total == 0
     assert summary.by_severity["high"] == 0
 
 
 def test_low_and_medium_complete() -> None:
-    status, _ = evaluate(
-        [_finding("low"), _finding("medium")], {"semgrep": _ok("semgrep")}
-    )
+    status, _ = evaluate([_finding("low"), _finding("medium")], {"semgrep": _ok("semgrep")})
     assert status == "completed"
 
 
@@ -79,16 +75,12 @@ def test_one_scanner_failed_is_partial() -> None:
 
 
 def test_all_scanners_failed_is_failed() -> None:
-    status, _ = evaluate(
-        [], {"semgrep": _failed("semgrep"), "gitleaks": _failed("gitleaks")}
-    )
+    status, _ = evaluate([], {"semgrep": _failed("semgrep"), "gitleaks": _failed("gitleaks")})
     assert status == "failed"
 
 
 def test_failure_beats_low_findings() -> None:
-    status, _ = evaluate(
-        [_finding("low")], {"semgrep": _failed("semgrep")}
-    )
+    status, _ = evaluate([_finding("low")], {"semgrep": _failed("semgrep")})
     assert status == "failed"
 
 

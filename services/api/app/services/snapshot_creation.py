@@ -245,9 +245,7 @@ def snapshot_from_tree(
         )
     if security_key is not None:
         if security_digest is None or security_bytes is None:
-            raise ApiError(
-                500, "INTERNAL_ERROR", "The security artifact record is incomplete."
-            )
+            raise ApiError(500, "INTERNAL_ERROR", "The security artifact record is incomplete.")
         try:
             sec_bytes = store.get_bytes(bucket, security_key)
         except StorageError as exc:

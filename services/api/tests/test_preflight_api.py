@@ -122,7 +122,10 @@ def test_get_assessment_detail(
     project = make_project(auth_client, workspace["id"], "api")
     upload = upload_data(auth_client, project["id"], make_zip(CODE))
     assessment = _seed(
-        db_session, workspace["id"], project["id"], upload,
+        db_session,
+        workspace["id"],
+        project["id"],
+        upload,
         [_record("semgrep", "r1", "high", "src/app.py")],
     )
     response = auth_client.get(f"/api/v1/security-assessments/{assessment.id}")
@@ -145,15 +148,11 @@ def test_snapshot_latest_assessment(
     second = upload_data(auth_client, project["id"], make_zip(OTHER))
     _seed(db_session, workspace["id"], project["id"], first, [])
 
-    response = auth_client.get(
-        f"/api/v1/snapshots/{first['snapshot']['id']}/security-assessment"
-    )
+    response = auth_client.get(f"/api/v1/snapshots/{first['snapshot']['id']}/security-assessment")
     assert response.status_code == 200, response.text
     assert response.json()["data"]["snapshot_id"] == first["snapshot"]["id"]
 
-    missing = auth_client.get(
-        f"/api/v1/snapshots/{second['snapshot']['id']}/security-assessment"
-    )
+    missing = auth_client.get(f"/api/v1/snapshots/{second['snapshot']['id']}/security-assessment")
     assert missing.status_code == 404, missing.text
 
     ghost = auth_client.get(f"/api/v1/snapshots/{uuid.uuid4()}/security-assessment")
@@ -187,14 +186,15 @@ def test_project_list_paginates(
     assert bad_cursor.status_code == 422, bad_cursor.text
 
 
-def test_findings_filters(
-    auth_client: TestClient, fake_store: FakeObjectStore, db_session
-) -> None:  # type: ignore[no-untyped-def]
+def test_findings_filters(auth_client: TestClient, fake_store: FakeObjectStore, db_session) -> None:  # type: ignore[no-untyped-def]
     workspace = make_workspace(auth_client, "wfind")
     project = make_project(auth_client, workspace["id"], "find")
     upload = upload_data(auth_client, project["id"], make_zip(CODE))
     _seed(
-        db_session, workspace["id"], project["id"], upload,
+        db_session,
+        workspace["id"],
+        project["id"],
+        upload,
         [
             _record("semgrep", "r-high", "high", "src/app.py"),
             _record("gitleaks", "aws-key", "high", ".env"),
@@ -236,30 +236,19 @@ def test_foreign_workspace_rows_are_hidden(
     project = make_project(owner, workspace["id"], "secp")
     upload = upload_data(owner, project["id"], make_zip(CODE))
     assessment = _seed(
-        db_session, workspace["id"], project["id"], upload,
+        db_session,
+        workspace["id"],
+        project["id"],
+        upload,
         [_record("semgrep", "r1", "high", "src/app.py")],
     )
+    assert other.get(f"/api/v1/security-assessments/{assessment.id}").status_code == 404
+    assert other.get(f"/api/v1/security-assessments/{assessment.id}/findings").status_code == 404
     assert (
-        other.get(f"/api/v1/security-assessments/{assessment.id}").status_code == 404
-    )
-    assert (
-        other.get(
-            f"/api/v1/security-assessments/{assessment.id}/findings"
-        ).status_code
+        other.get(f"/api/v1/snapshots/{upload['snapshot']['id']}/security-assessment").status_code
         == 404
     )
-    assert (
-        other.get(
-            f"/api/v1/snapshots/{upload['snapshot']['id']}/security-assessment"
-        ).status_code
-        == 404
-    )
-    assert (
-        other.get(
-            f"/api/v1/projects/{project['id']}/security-assessments"
-        ).status_code
-        == 404
-    )
+    assert other.get(f"/api/v1/projects/{project['id']}/security-assessments").status_code == 404
 
 
 def test_retry_reuses_assessment_row(
@@ -268,6 +257,7 @@ def test_retry_reuses_assessment_row(
     workspace = make_workspace(auth_client, "wretry")
     project = make_project(auth_client, workspace["id"], "retry")
     upload = upload_data(auth_client, project["id"], make_zip(CODE))
+
     def _get_or_create():  # type: ignore[no-untyped-def]
         return assessment_service.get_or_create_assessment(
             db_session,
@@ -281,7 +271,11 @@ def test_retry_reuses_assessment_row(
 
     first = _get_or_create()
     assessment_service.store_assessment_result(
-        db_session, first.id, status="failed", summary={}, scanner_versions={},
+        db_session,
+        first.id,
+        status="failed",
+        summary={},
+        scanner_versions={},
         records=[_record("semgrep", "r1", "high", "src/app.py")],
     )
     second = _get_or_create()
@@ -291,6 +285,8 @@ def test_retry_reuses_assessment_row(
     findings, _ = assessment_service.list_findings(
         db_session,
         db_session.execute(select(User).where(User.email == "owner@example.com")).scalar_one(),
-        first.id, 25, None,
+        first.id,
+        25,
+        None,
     )
     assert findings == []

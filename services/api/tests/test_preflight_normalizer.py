@@ -30,8 +30,19 @@ def test_validate_rel_path_accepts_nested() -> None:
 
 @pytest.mark.parametrize(
     "bad",
-    ["", "/abs.py", "C:/x.py", "../up.py", "a/../../up.py", "a\\b.py", "a\x00b",
-     ".", "a/" + "x" * 2000 + ".py", None, 42],
+    [
+        "",
+        "/abs.py",
+        "C:/x.py",
+        "../up.py",
+        "a/../../up.py",
+        "a\\b.py",
+        "a\x00b",
+        ".",
+        "a/" + "x" * 2000 + ".py",
+        None,
+        42,
+    ],
 )
 def test_validate_rel_path_rejects(bad) -> None:  # type: ignore[no-untyped-def]
     with pytest.raises(FindingValidationError):
@@ -62,10 +73,7 @@ def test_validate_text_rejects_empty_and_nul() -> None:
 
 
 def test_mask_secret_private_key_fully_withheld() -> None:
-    assert (
-        mask_secret("anything", "private-key-rule")
-        == "[private key material redacted]"
-    )
+    assert mask_secret("anything", "private-key-rule") == "[private key material redacted]"
     assert (
         mask_secret("-----BEGIN PRIVATE KEY-----\nabc", "generic")
         == "[private key material redacted]"

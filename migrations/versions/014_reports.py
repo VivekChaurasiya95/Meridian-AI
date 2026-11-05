@@ -45,12 +45,10 @@ def upgrade() -> None:
         """
     )
     op.execute(
-        "CREATE INDEX idx_reports_inv "
-        "ON reports(investigation_id, created_at, id)"
+        "CREATE INDEX idx_reports_inv ON reports(investigation_id, created_at, id)"
     )
     op.execute(
-        "CREATE INDEX idx_reports_project "
-        "ON reports(project_id, created_at, id)"
+        "CREATE INDEX idx_reports_project ON reports(project_id, created_at, id)"
     )
 
 

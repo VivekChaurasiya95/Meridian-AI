@@ -166,8 +166,11 @@ def test_materialize_security_input_round_trip(
     dest = tmp_path / "sec"
     dest.mkdir()
     material = storage_service.materialize_security_input_for_workspace(
-        db_session, uuid.UUID(workspace["id"]), uuid.UUID(data["snapshot"]["id"]),
-        str(dest), store=fake_store,
+        db_session,
+        uuid.UUID(workspace["id"]),
+        uuid.UUID(data["snapshot"]["id"]),
+        str(dest),
+        store=fake_store,
     )
     assert material["files"] == 3
     assert material["secret_files"] == 2
@@ -189,8 +192,11 @@ def test_materialize_rejects_tampered_security_object(
     dest.mkdir()
     with pytest.raises(ApiError) as exc:
         storage_service.materialize_security_input_for_workspace(
-            db_session, uuid.UUID(workspace["id"]), uuid.UUID(data["snapshot"]["id"]),
-            str(dest), store=fake_store,
+            db_session,
+            uuid.UUID(workspace["id"]),
+            uuid.UUID(data["snapshot"]["id"]),
+            str(dest),
+            store=fake_store,
         )
     assert exc.value.code == "INTEGRITY_FAILED"
     db_session.refresh(row)
@@ -211,8 +217,11 @@ def test_materialize_rejects_foreign_workspace(
     dest.mkdir()
     with pytest.raises(ApiError) as exc:
         storage_service.materialize_security_input_for_workspace(
-            db_session, uuid.UUID(foreign_ws), uuid.UUID(data["snapshot"]["id"]),
-            str(dest), store=fake_store,
+            db_session,
+            uuid.UUID(foreign_ws),
+            uuid.UUID(data["snapshot"]["id"]),
+            str(dest),
+            store=fake_store,
         )
     assert exc.value.code == "RESOURCE_NOT_FOUND"
 
@@ -223,9 +232,7 @@ def test_enqueue_preflight_is_idempotent(
     workspace = make_workspace(auth_client, "widem")
     project = make_project(auth_client, workspace["id"], "idem")
     data = upload_data(auth_client, project["id"], make_zip(PLAIN))
-    user = db_session.execute(
-        select(User).where(User.email == "owner@example.com")
-    ).scalar_one()
+    user = db_session.execute(select(User).where(User.email == "owner@example.com")).scalar_one()
     first, created_first = job_service.enqueue_security_preflight(
         db_session, user, uuid.UUID(workspace["id"]), uuid.UUID(data["snapshot"]["id"])
     )

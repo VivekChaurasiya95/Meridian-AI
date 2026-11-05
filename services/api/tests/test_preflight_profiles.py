@@ -84,9 +84,7 @@ def test_pack_default_unchanged(tmp_path: pathlib.Path) -> None:
 
 def test_pack_base_image_override(tmp_path: pathlib.Path) -> None:
     _write(tmp_path, "a.py")
-    context, _ = workspace.pack_build_context(
-        str(tmp_path), base_image="semgrep/semgrep:1.183.0"
-    )
+    context, _ = workspace.pack_build_context(str(tmp_path), base_image="semgrep/semgrep:1.183.0")
     with tarfile.open(fileobj=io.BytesIO(context), mode="r") as tar:
         dockerfile = tar.extractfile("Meridian.Dockerfile").read().decode()  # type: ignore[union-attr]
     assert dockerfile.startswith("FROM semgrep/semgrep:1.183.0\n")
@@ -129,9 +127,7 @@ def test_pack_extras_reject_escape_and_snapshot_collision(tmp_path: pathlib.Path
     _write(tmp_path, "a.py")
     for bad in ("r.yml", "Meridian.rules/", "Meridian.rules/a/b.yml", "Meridian.rules/.."):
         with pytest.raises(SandboxError):
-            workspace.pack_build_context(
-                str(tmp_path), extra_root_files={bad: b"x"}
-            )
+            workspace.pack_build_context(str(tmp_path), extra_root_files={bad: b"x"})
     _write(tmp_path, "Meridian.rules/evil.yml", "x")
     with pytest.raises(SandboxError) as exc:
         workspace.pack_build_context(str(tmp_path))
