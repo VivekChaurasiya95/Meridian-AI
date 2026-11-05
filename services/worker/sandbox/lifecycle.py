@@ -199,6 +199,39 @@ def prune_stale_containers(
     return {"pruned": pruned, "kept": kept, "failed": failed, "pruned_ids": sorted(pruned_ids)}
 
 
+def prune_stale_volumes(client: Any, is_live: Callable[[str], bool]) -> dict:
+    """Remove managed output volumes with no live execution (M6).
+
+    Mirrors container pruning: only ``meridian.managed=true`` volumes are
+    listed, liveness is re-checked per volume, and unlabeled volumes are
+    never touched. Idempotent.
+    """
+    try:
+        volumes = client.volumes.list(filters={"label": "meridian.managed=true"})
+    except Exception as exc:
+        raise SandboxError(
+            "PRUNE_LIST_FAILED", "Managed volumes could not be listed.", True
+        ) from exc
+    pruned = 0
+    kept = 0
+    failed = 0
+    for volume in volumes:
+        try:
+            labels = (volume.attrs or {}).get("Labels") or {}
+            execution_id = labels.get("meridian.execution_id", "")
+            if execution_id and is_live(execution_id):
+                kept += 1
+                continue
+            volume.remove(force=True)
+            pruned += 1
+        except Exception:
+            failed += 1
+    logger.info(
+        "orphan volume prune pruned=%d kept=%d failed=%d", pruned, kept, failed
+    )
+    return {"pruned": pruned, "kept": kept, "failed": failed}
+
+
 def recover_orphans(session_factory: Any, client: Any) -> dict:
     """Worker-startup recovery: destroy managed containers with no live execution.
 
@@ -235,8 +268,13 @@ def recover_orphans(session_factory: Any, client: Any) -> dict:
                 update_cleanup(session, uuid.UUID(hex=execution_id_hex), "cleaned")
         except ValueError:
             continue
+    volumes = prune_stale_volumes(client, is_live)
+    result["volumes_pruned"] = volumes["pruned"]
+    result["volumes_kept"] = volumes["kept"]
+    result["volumes_failed"] = volumes["failed"]
     logger.info(
-        "orphan recovery pruned=%d kept=%d failed=%d",
+        "orphan recovery pruned=%d kept=%d failed=%d volumes_pruned=%d kept=%d failed=%d",
         result["pruned"], result["kept"], result["failed"],
+        volumes["pruned"], volumes["kept"], volumes["failed"],
     )
     return result

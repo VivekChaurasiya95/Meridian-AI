@@ -295,7 +295,6 @@ def run_preflight(
         if _safe_abort():
             with session_factory() as session:
                 assessment_service.mark_assessment(session, assessment_id, "cancelled")
-            _stage(session_factory, job_id, worker_id, "cleanup", "completed")
             raise PreflightFailure("EXECUTION_CANCELLED", "The preflight run was cancelled.")
 
         if not any(outcome.status == "completed" for outcome in outcomes.values()):
@@ -370,6 +369,9 @@ def run_preflight(
 
             resolved = resolve_text_provider()
             if resolved.configured and resolved.provider is not None and records:
+                _stage(
+                    session_factory, job_id, worker_id, "ai_interpretation", "running"
+                )
                 brief = "; ".join(
                     f"{item.severity} {item.rule_id} {item.path}" for item in kept[:20]
                 )
@@ -402,6 +404,7 @@ def run_preflight(
                 logger.warning("assessment mark failed error=%s", mark_exc)
         raise
     finally:
+        _stage(session_factory, job_id, worker_id, "cleanup", "running")
         cleaned = True
         for ws_dir in ws_dirs:
             cleaned = workspace.destroy_workspace(ws_dir) and cleaned
