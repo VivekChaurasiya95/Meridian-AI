@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/VivekChaurasiya95/Meridian-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/VivekChaurasiya95/Meridian-AI/actions)
 [![License: MIT](https://img.shields.io/github/license/VivekChaurasiya95/Meridian-AI)](LICENSE)
-[![Milestone](https://img.shields.io/badge/milestone-M9_complete-6B7A56)](IMPLEMENTATION_PLAN.md)
+[![Milestone](https://img.shields.io/badge/milestone-M10_complete-6B7A56)](IMPLEMENTATION_PLAN.md)
 [![Node](https://img.shields.io/badge/node-%3E%3D20.9-339933?logo=node.js&logoColor=white)](apps/web/package.json)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.12-3776AB?logo=python&logoColor=white)](services/api/pyproject.toml)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/VivekChaurasiya95/Meridian-AI/pulls)
@@ -315,7 +315,7 @@ apps/web/                 Next.js frontend (App Router, TypeScript, Tailwind v4)
 └── public/               Brand art + developer portrait
 services/api/             FastAPI backend — app/ source with co-located tests/
 services/worker/          Durable job worker: pipeline, sandbox, security preflight
-migrations/               Alembic migrations, versioned history (head: 013)
+migrations/               Alembic migrations, versioned history (head: 015)
 docs/DECISIONS.md         Working architecture decision log (D1–D69+)
 public/                   Product specifications — source of truth; never edited
 docker-compose.yml        db · minio · minio-init · api · worker services
@@ -520,7 +520,7 @@ Full plan: `IMPLEMENTATION_PLAN.md`.
 - [x] **M7** — Evidence-grounded hypotheses via a provider adapter (fake default blocks honestly)
 - [x] **M8** — Regression tests, baseline/post-patch verification, patch proposals with scoped human approval
 - [x] **M9** — Investigation reports, security preflight (Semgrep + Gitleaks), Meta Muse wiring
-- [ ] **M10** — Verification reruns/comparison
+- [x] **M10** — Verification reruns/comparison (API + investigation detail UI)
 
 ## 15. Troubleshooting & FAQ
 
