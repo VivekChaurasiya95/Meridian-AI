@@ -161,6 +161,20 @@ class Settings(BaseSettings):
     ai_log_request_metadata: bool = True
     ai_log_prompt_content: bool = False
 
+    # Meta Spark (text/reasoning) + SAM (image segmentation). Both
+    # disabled until an operator verifies the provider docs and sets
+    # IDs/keys. SAM never runs inside API request handling; worker-only.
+    meta_spark_enabled: bool = False
+    meta_spark_base_url: str = ""
+    meta_spark_api_key: str = ""
+    meta_spark_model: str = ""
+    meta_sam_enabled: bool = False
+    meta_sam_base_url: str = ""
+    meta_sam_api_key: str = ""
+    meta_sam_model: str = ""
+    meta_sam_timeout_seconds: int = Field(default=120, ge=10, le=600)
+    meta_sam_max_image_mb: int = Field(default=10, ge=1, le=50)
+
     @property
     def upload_max_bytes(self) -> int:
         return self.upload_max_mb * 1024 * 1024

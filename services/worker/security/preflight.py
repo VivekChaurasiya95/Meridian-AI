@@ -361,6 +361,32 @@ def run_preflight(
             session_factory, job_id, worker_id, "persist_assessment", "completed",
             result_summary={"status": status, "persisted": len(records)},
         )
+        # AI interpretation layer (post-scanner, best-effort): explains
+        # persisted findings only. Never invents findings, never fails
+        # the job, and is skipped honestly when no provider is set.
+        try:
+            from app.ai import TASK_SECURITY_INTERPRETATION, timed_complete
+            from app.ai.providers import resolve_text_provider
+
+            resolved = resolve_text_provider()
+            if resolved.configured and resolved.provider is not None and records:
+                brief = "; ".join(
+                    f"{item.severity} {item.rule_id} {item.path}" for item in kept[:20]
+                )
+                timed_complete(
+                    resolved.provider,
+                    TASK_SECURITY_INTERPRETATION,
+                    "Explain these security findings briefly for developers. "
+                    "Use only the listed findings.",
+                    f"Findings: {brief[:4000]}",
+                    "security_interpretation",
+                )
+                _stage(
+                    session_factory, job_id, worker_id, "ai_interpretation",
+                    "completed", result_summary={"findings": len(records)},
+                )
+        except Exception as exc:  # noqa: BLE001 — interpretation must never break preflight
+            logger.info("ai interpretation skipped error=%s", exc)
         return {
             "assessment_id": str(assessment_id),
             "snapshot_id": str(snapshot_id),

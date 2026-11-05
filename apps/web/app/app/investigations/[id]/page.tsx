@@ -28,6 +28,7 @@ import type {
   StageStatus,
 } from "@/lib/types";
 import { HypothesisCard } from "@/components/investigations/HypothesisCard";
+import { LatestReportCard } from "@/components/investigations/LatestReportCard";
 import { PatchesSection } from "@/components/investigations/PatchesSection";
 import { ReportsSection } from "@/components/investigations/ReportsSection";
 import { TestsSection } from "@/components/investigations/TestsSection";
@@ -427,6 +428,8 @@ export default function InvestigationDetailPage() {
       <PatchesSection investigationId={id} onChanged={() => void load()} />
 
       <ReportsSection investigationId={id} />
+
+      <LatestReportCard investigationId={id} />
 
       <section aria-label="Activity">
         <h2 className="mb-2 text-[15px] font-semibold">Activity</h2>

@@ -394,21 +394,39 @@ files, model key stays server-side only (never `NEXT_PUBLIC_`).
 | `S3_ENDPOINT_URL` | `http://localhost:9010` | MinIO S3 API (compose host mapping) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | dev defaults | MinIO identity (least privilege per service) |
 
-### 11.3 Model provider — Meta Muse (root `.env`, optional)
+### 11.3 Model providers — Meta Spark + Meta SAM (root `.env`, optional)
 
-Reasoning stages (hypotheses, reports) call an OpenAI-compatible chat API. Without
-a key they block honestly (`MODEL_NOT_CONFIGURED`) instead of emitting output.
+All LLM calls go through the centralized gateway (`services/api/app/ai/`) with
+task-based routing, token budgets, secret redaction, and metadata-only telemetry.
+Deterministic scanners (Semgrep/Gitleaks) remain the source of findings. Models
+never invent scan results and never execute code outside the sandbox.
+
+Meta Spark (text/reasoning) powers investigation planning, root-cause analysis,
+report generation, and summarization. Meta SAM (image segmentation) powers
+screenshot/evidence analysis in the worker only. Both ship disabled. Verify the
+exact base URL and model IDs in the provider documentation before enabling.
 
 ```dotenv
-MODEL_PROVIDER=muse
-MODEL_API_BASE=https://api.meta.ai/v1
-MODEL_API_KEY=<your-key-here>
-MODEL_NAME=muse-spark-1.3
+META_ENABLED=false
+META_BASE_URL=
+META_API_KEY=
+META_MODEL_DEFAULT=
+META_MODEL_REASONING=
+META_MODEL_FAST=
+META_MODEL_REPORT=
+META_SPARK_ENABLED=false
+META_SPARK_BASE_URL=
+META_SPARK_API_KEY=
+META_SPARK_MODEL=
+META_SAM_ENABLED=false
+META_SAM_BASE_URL=
+META_SAM_API_KEY=
+META_SAM_MODEL=
 ```
 
-Restart the API/worker after adding a key and check `/health/ready` →
-`"model": "ok"`. Costs fractions of a cent per investigation. See
-`docs/DECISIONS.md` D69 for the verified contract notes.
+Copy the Meta block from `.env.example` into your local `.env`. Never commit
+`.env`. The app keeps working without keys. Restart the API and worker after
+changing values. See `META_INTEGRATION_PLAN.md` for routing and safeguards.
 
 ### 11.4 Social sign-in — Firebase (optional)
 

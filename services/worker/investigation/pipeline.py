@@ -436,6 +436,20 @@ def _reproduce(
         snapshot_id=snapshot_id, workspace_id=workspace_id,
         client=client, store=store, is_cancelled=is_cancelled,
     )
+    # SAM evidence-image segmentation (best-effort, never blocks repro):
+    # disabled/unconfigured providers are logged and skipped honestly.
+    for evidence_id in summary.get("evidence_ids", [])[:3]:
+        try:
+            from app.ai.providers import segment_image
+            from app.config import get_settings
+
+            sam = get_settings()
+            segment_image(
+                sam.meta_sam_enabled, sam.meta_sam_base_url,
+                sam.meta_sam_api_key, sam.meta_sam_model, str(evidence_id),
+            )
+        except Exception as exc:  # noqa: BLE001 — SAM must never break repro
+            logger.info("sam skipped evidence=%s error=%s", evidence_id, exc)
     return {
         "reproduced": summary["reproduced"],
         "assertions_total": summary["assertions_total"],
@@ -523,11 +537,7 @@ def _review(
 
     from app.models import Investigation, InvestigationStage
     from app.services import hypotheses as hypothesis_service
-    from app.services.model_gateway import (
-        SCHEMA_HYPOTHESES,
-        get_configured_provider,
-        parse_hypotheses,
-    )
+    from app.services.model_gateway import SCHEMA_HYPOTHESES, parse_hypotheses
 
     with session_factory() as session:
         analysis = (
@@ -551,12 +561,7 @@ def _review(
                 Investigation.id == investigation_id
             )
         ).one()
-    provider = model_provider
-    if provider is None:
-        resolved = get_configured_provider()
-        if not resolved.configured or resolved.provider is None:
-            raise InvestigationFailure("MODEL_NOT_CONFIGURED", resolved.reason, False)
-        provider = resolved.provider
+    provider = _resolve_provider(model_provider)
     bundle = _case_bundle(session_factory, investigation_id, store, case[0], case[1])
 
     tool_run_id: uuid.UUID | None = None
@@ -580,8 +585,9 @@ def _review(
     last_error: InvestigationFailure | None = None
     for _ in range(HYPOTHESIS_RESAMPLES):
         try:
-            result = provider.complete_json(
-                HYPOTHESIS_SYSTEM_PROMPT, bundle["prompt"], SCHEMA_HYPOTHESES
+            result = _sample_model(
+                provider, HYPOTHESIS_SYSTEM_PROMPT, bundle["prompt"],
+                SCHEMA_HYPOTHESES, "root_cause_analysis",
             )
         except ApiError as exc:
             if exc.code == "MODEL_PROVIDER_UNAVAILABLE":
@@ -765,7 +771,9 @@ def _generate_report(
     )
     last_error = "unknown error"
     for _ in range(MODEL_RESAMPLES):
-        result = _sample_model(provider, REPORT_SYSTEM_PROMPT, prompt, SCHEMA_REPORT)
+        result = _sample_model(
+            provider, REPORT_SYSTEM_PROMPT, prompt, SCHEMA_REPORT, "report_generation"
+        )
         try:
             draft = parse_report(result.document)
         except ApiError as exc:
@@ -817,11 +825,12 @@ def _project_and_snapshot(
 
 
 def _resolve_provider(model_provider: Any) -> Any:
-    from app.services.model_gateway import get_configured_provider
+    """Resolve via the AI gateway: Meta Spark > Meta Llama > existing."""
+    from app.ai.providers import resolve_text_provider
 
     if model_provider is not None:
         return model_provider
-    resolved = get_configured_provider()
+    resolved = resolve_text_provider()
     if not resolved.configured or resolved.provider is None:
         raise InvestigationFailure("MODEL_NOT_CONFIGURED", resolved.reason, False)
     return resolved.provider
@@ -864,10 +873,13 @@ def _fail_tool_run(session_factory: Any, tool_run_id: uuid.UUID, code: str) -> N
 
 
 def _sample_model(
-    provider: Any, system_prompt: str, user_prompt: str, schema_name: str
+    provider: Any, system_prompt: str, user_prompt: str, schema_name: str,
+    task: str = "complex_reasoning",
 ) -> Any:
+    from app.ai import timed_complete
+
     try:
-        return provider.complete_json(system_prompt, user_prompt, schema_name)
+        return timed_complete(provider, task, system_prompt, user_prompt, schema_name)
     except ApiError as exc:
         if exc.code == "MODEL_PROVIDER_UNAVAILABLE":
             raise InvestigationFailure(exc.code, exc.message, True) from exc
@@ -933,7 +945,8 @@ def _create_tests(
     last_error: InvestigationFailure | None = None
     for _ in range(MODEL_RESAMPLES):
         result = _sample_model(
-            provider, TESTS_SYSTEM_PROMPT, prompt, SCHEMA_REGRESSION_TESTS
+            provider, TESTS_SYSTEM_PROMPT, prompt, SCHEMA_REGRESSION_TESTS,
+            "structured_extraction",
         )
         try:
             drafts = parse_regression_tests(result.document, settings)
@@ -1219,7 +1232,9 @@ def _propose_patch(
     settings = get_settings()
     last_error: InvestigationFailure | None = None
     for _ in range(MODEL_RESAMPLES):
-        result = _sample_model(provider, PATCH_SYSTEM_PROMPT, prompt, SCHEMA_PATCH)
+        result = _sample_model(
+            provider, PATCH_SYSTEM_PROMPT, prompt, SCHEMA_PATCH, "remediation_suggestion"
+        )
         try:
             draft = parse_patch_proposal(result.document, settings.patch_max_diff_bytes)
         except ApiError:

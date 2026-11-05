@@ -7,6 +7,7 @@ import { ArrowLeft, FolderKanban } from "lucide-react";
 import { MeridianApiError, formatTimestamp, getWorkspace, updateWorkspace } from "@/lib/api";
 import type { Workspace } from "@/lib/types";
 import { useAuth } from "@/components/auth/AuthContext";
+import { AuditTrail } from "@/components/workspaces/AuditTrail";
 import { MembersCard } from "@/components/workspaces/MembersCard";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -177,6 +178,8 @@ export default function WorkspaceDetailPage() {
       </Card>
 
       <MembersCard workspaceId={id} canManage={canManage} currentUserId={user?.id ?? ""} />
+
+      {canManage && <AuditTrail workspaceId={id} />}
 
       <Card>
         <CardHeader>

@@ -64,6 +64,18 @@ def test_prepare_context_dedupes_and_bounds() -> None:
     assert estimate_tokens(prepared) <= 1000
 
 
+def test_meta_providers_fail_closed_when_disabled() -> None:
+    from app.ai.providers import require_spark, segment_image
+
+    with pytest.raises(ApiError) as spark_exc:
+        require_spark(False, "https://example.invalid/v1", "k", "m")
+    assert spark_exc.value.code == "MODEL_PROVIDER_UNAVAILABLE"
+
+    with pytest.raises(ApiError) as sam_exc:
+        segment_image(False, "", "", "", "evidence/shot.png")
+    assert sam_exc.value.code == "MODEL_PROVIDER_UNAVAILABLE"
+
+
 def test_timed_complete_returns_validated_result() -> None:
     provider = FakeModelProvider([{"hypotheses": [{"title": "t", "description": "d"}]}])
     result = timed_complete(provider, TASK_ROOT_CAUSE_ANALYSIS, "sys", "user", "hypotheses_v1")
