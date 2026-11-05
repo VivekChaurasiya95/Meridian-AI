@@ -31,6 +31,13 @@ export const metadata: Metadata = {
   title: "Meridian AI — Clarity for complex engineering",
   description:
     "Meridian AI turns bug reports into structured, evidence-backed investigations.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

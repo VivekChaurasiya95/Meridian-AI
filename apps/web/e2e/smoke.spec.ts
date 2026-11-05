@@ -10,7 +10,7 @@ test("landing presents the product without fake claims", async ({ page }) => {
     page.getByRole("heading", { name: "One pipeline, from report to verified fix." }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /open the workspace/i }).first()).toBeVisible();
-  await expect(page.getByText("Concept preview", { exact: false })).toBeVisible();
+  await expect(page.getByText("Illustrative demo", { exact: false })).toBeVisible();
   // No fabricated social proof anywhere on the page.
   await expect(page.getByText(/trusted by|testimonial|customers/i)).toHaveCount(0);
 });

@@ -55,6 +55,9 @@ try {
     New-Item -ItemType Directory $stage | Out-Null
     "# smoke app" | Out-File (Join-Path $stage "README.md") -Encoding utf8
     "print('smoke ok')" | Out-File (Join-Path $stage "main.py") -Encoding utf8
+    # M6 browser repro serves static snapshots: include a minimal HTML entrypoint.
+    "<!doctype html><html><body><button id='go'>Go</button></body></html>" |
+        Out-File (Join-Path $stage "index.html") -Encoding utf8
     Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zipPath
     $up = & curl.exe -sS -c $jar -b $jar -H "Origin: http://localhost:3010" `
         -F "file=@$zipPath;type=application/zip" `
