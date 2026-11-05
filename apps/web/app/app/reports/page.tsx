@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { usePolling } from "@/lib/usePolling";
 
 const STATUS_TONE: Record<ReportStatus, "success" | "info" | "warning" | "danger" | "neutral"> = {
   queued: "neutral",
@@ -78,12 +79,14 @@ export default function ReportsPage() {
       try {
         setItems(await listWorkspaceReports(workspace));
         if (!silent) setError(null);
+        return true;
       } catch (err) {
         if (err instanceof MeridianApiError && err.status === 401) {
           router.push("/login?next=%2Fapp%2Freports");
-          return;
+          return false;
         }
         if (!silent) setError(err instanceof Error ? err.message : "Could not load reports.");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -98,13 +101,11 @@ export default function ReportsPage() {
   }, [workspaceId, refresh]);
 
   const live = items.some((report) => report.status === "queued" || report.status === "running");
-  React.useEffect(() => {
-    if (!live || !workspaceId) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void refresh(workspaceId, true);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [live, workspaceId, refresh]);
+  const poll = React.useCallback(
+    () => (workspaceId ? refresh(workspaceId, true) : undefined),
+    [workspaceId, refresh],
+  );
+  usePolling(live && workspaceId !== null, poll, { baseMs: 5000 });
 
   async function onDownload(report: Report) {
     setDownloading(report.id);

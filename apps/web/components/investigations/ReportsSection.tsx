@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { usePolling } from "@/lib/usePolling";
 import {
   MeridianApiError,
   createReport,
@@ -35,6 +37,7 @@ const STATUS_LABEL: Record<ReportStatus, string> = {
 
 /** Reports section: history, generate action, and downloads (M10). */
 export function ReportsSection({ investigationId }: { investigationId: string }) {
+  const toast = useToast();
   const [reports, setReports] = React.useState<Report[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
@@ -47,14 +50,16 @@ export function ReportsSection({ investigationId }: { investigationId: string })
     try {
       setReports(await listReports(investigationId));
       setError(null);
+      return true;
     } catch (err) {
       // A missing endpoint means an older backend: hide the section
       // instead of alarming. Any other failure still surfaces.
       if (err instanceof MeridianApiError && err.status === 404) {
         setUnsupported(true);
-        return;
+        return true;
       }
       setError(err instanceof Error ? err.message : "Could not load reports.");
+      return false;
     }
   }, [investigationId]);
 
@@ -63,13 +68,7 @@ export function ReportsSection({ investigationId }: { investigationId: string })
   }, [load]);
 
   const live = reports?.some((report) => report.status === "queued" || report.status === "running") ?? false;
-  React.useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void load();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [live, load]);
+  usePolling(live, load, { baseMs: 5000 });
 
   if (unsupported) return null;
 
@@ -80,6 +79,7 @@ export function ReportsSection({ investigationId }: { investigationId: string })
     try {
       const created = await createReport(investigationId, { format });
       setReports((current) => (current === null ? [created] : [created, ...current]));
+      toast.success("Report generation queued.");
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not generate a report.");
     } finally {

@@ -637,6 +637,7 @@ const INVESTIGATION_TONE: Record<
 const SEVERITIES: InvestigationSeverity[] = ["low", "medium", "high", "critical", "unspecified"];
 
 function InvestigationsTab({ project }: { project: Project }) {
+  const toast = useToast();
   const [items, setItems] = React.useState<Investigation[] | null>(null);
   const [snapshots, setSnapshots] = React.useState<SnapshotSummary[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -689,6 +690,7 @@ function InvestigationsTab({ project }: { project: Project }) {
         `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       );
       setItems((prev) => (prev === null ? [created] : [created, ...prev]));
+      toast.success(`Investigation “${created.title}” opened.`);
       setTitle("");
       setBugReport("");
     } catch (err) {
@@ -828,6 +830,7 @@ function SettingsTab({
   onChanged: (project: Project) => void;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = React.useState(project.name);
   const [description, setDescription] = React.useState(project.description ?? "");
   const [saving, setSaving] = React.useState(false);
@@ -863,6 +866,7 @@ function SettingsTab({
     try {
       await uploadProjectArchive(project.id, file, setUploadFraction);
       onChanged(await getProject(project.id));
+      toast.success("Snapshot stored.");
       setUploadDone(true);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "The upload failed.");
@@ -898,6 +902,7 @@ function SettingsTab({
         if (current.status === "completed") {
           const sha = current.result?.commit_sha;
           onChanged(await getProject(project.id));
+          toast.success("Snapshot stored from GitHub.");
           setGitDone(
             typeof sha === "string" && sha
               ? `Snapshot stored from ${valid.canonical_url} at ${sha.slice(0, 7)}. Open the Snapshots tab to inspect it.`
@@ -930,6 +935,7 @@ function SettingsTab({
     setSaved(false);
     try {
       onChanged(await updateProject(project.id, { name: name.trim(), description: description.trim() || null }));
+      toast.success("Project settings saved.");
       setSaved(true);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Could not save settings.");
@@ -942,10 +948,15 @@ function SettingsTab({
     setWorking(true);
     setLifecycleError(null);
     try {
-      if (action === "archive") onChanged(await archiveProject(project.id));
-      else if (action === "unarchive") onChanged(await unarchiveProject(project.id));
-      else {
+      if (action === "archive") {
+        onChanged(await archiveProject(project.id));
+        toast.success(`Project “${project.name}” archived.`);
+      } else if (action === "unarchive") {
+        onChanged(await unarchiveProject(project.id));
+        toast.success(`Project “${project.name}” restored.`);
+      } else {
         await deleteProject(project.id);
+        toast.success(`Project “${project.name}” deleted.`);
         router.push(`/app/projects?workspace=${project.workspace_id}`);
         return;
       }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MeridianApiError, formatTimestamp, reviewHypothesis } from "@/lib/api";
 import type { Hypothesis, HypothesisVerdict } from "@/lib/types";
+import { useToast } from "@/components/ui/Toast";
 
 const VERDICT_LABEL: Record<HypothesisVerdict, string> = {
   useful: "Useful",
@@ -30,6 +31,7 @@ export function HypothesisCard({
   hypothesis: Hypothesis;
   onReviewed: () => void;
 }) {
+  const toast = useToast();
   const [formOpen, setFormOpen] = React.useState(false);
   const [verdict, setVerdict] = React.useState<HypothesisVerdict>("useful");
   const [note, setNote] = React.useState("");
@@ -50,6 +52,7 @@ export function HypothesisCard({
       });
       setFormOpen(false);
       setNote("");
+      toast.success(`Review recorded: ${VERDICT_LABEL[verdict].toLowerCase()}.`);
       onReviewed();
     } catch (err) {
       if (err instanceof MeridianApiError && err.status === 403) {

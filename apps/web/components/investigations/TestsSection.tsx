@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { createRegressionTest, listRegressionTests } from "@/lib/api";
 import type { RegressionTest } from "@/lib/types";
+import { useToast } from "@/components/ui/Toast";
 
 const STATUS_TONE: Record<string, "success" | "info" | "warning" | "danger" | "neutral"> = {
   proposed: "neutral",
@@ -25,6 +26,7 @@ const TEST_TYPES = ["e2e", "unit", "integration", "regression", "manual"];
 
 /** Regression tests: worker-driven checks plus manual test ideas (M8). */
 export function TestsSection({ investigationId }: { investigationId: string }) {
+  const toast = useToast();
   const [tests, setTests] = React.useState<RegressionTest[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
@@ -66,6 +68,7 @@ export function TestsSection({ investigationId }: { investigationId: string }) {
       setFilePath("");
       setTestName("");
       setFormOpen(false);
+      toast.success("Test idea proposed.");
       void load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not propose a test.");

@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { usePolling } from "@/lib/usePolling";
 
 const STATUS_TONE: Record<
   InvestigationStatus,
@@ -97,13 +98,15 @@ export default function InvestigationsPage() {
         const { items: list } = await listWorkspaceInvestigations(workspace);
         if (!silent) setError(null);
         setItems(list);
+        return true;
       } catch (err) {
         if (err instanceof MeridianApiError && err.status === 401) {
           router.push("/login?next=%2Fapp%2Finvestigations");
-          return;
+          return false;
         }
         if (!silent)
           setError(err instanceof Error ? err.message : "Could not load investigations.");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -121,13 +124,11 @@ export default function InvestigationsPage() {
     (investigation) =>
       investigation.status === "queued" || investigation.status === "running",
   );
-  React.useEffect(() => {
-    if (!live || !workspaceId) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void refresh(workspaceId, true);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [live, workspaceId, refresh]);
+  const poll = React.useCallback(
+    () => (workspaceId ? refresh(workspaceId, true) : undefined),
+    [workspaceId, refresh],
+  );
+  usePolling(live && workspaceId !== null, poll, { baseMs: 5000 });
 
   if (loading && items.length === 0 && !error) {
     return (

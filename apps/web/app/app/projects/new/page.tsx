@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
 const CLIENT_MAX_BYTES = 25 * 1024 * 1024;
@@ -102,6 +103,7 @@ export default function NewProjectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceParam = searchParams.get("workspace");
+  const toast = useToast();
 
   const [workspaces, setWorkspaces] = React.useState<Workspace[] | null>(null);
   const [workspaceId, setWorkspaceId] = React.useState<string | null>(workspaceParam);
@@ -237,6 +239,7 @@ export default function NewProjectPage() {
         branch: gitBranch || null,
         commit_sha: gitSha.trim() || null,
       });
+      toast.success(`Project “${project.name}” importing from GitHub.`);
       router.push(`/app/projects/${project.id}`);
     } catch (err) {
       if (err instanceof MeridianApiError && err.status === 401) {
@@ -299,6 +302,7 @@ export default function NewProjectPage() {
         return;
       }
       setResult(upload);
+      toast.success(`Project “${project.name}” created with its first snapshot.`);
       router.push(`/app/projects/${project.id}`);
     } catch (err) {
       if (controller.signal.aborted) {

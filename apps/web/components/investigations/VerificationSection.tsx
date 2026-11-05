@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { usePolling } from "@/lib/usePolling";
 import {
   VERDICT_LABEL,
   VerificationSummary,
@@ -41,6 +43,7 @@ function isRunnable(test: RegressionTest): boolean {
  * stay hidden until their endpoint exists.
  */
 export function VerificationSection({ investigationId }: { investigationId: string }) {
+  const toast = useToast();
   const [runs, setRuns] = React.useState<VerificationRun[] | null>(null);
   const [comparison, setComparison] = React.useState<VerificationComparison | null>(null);
   const [tests, setTests] = React.useState<RegressionTest[] | null>(null);
@@ -69,8 +72,10 @@ export function VerificationSection({ investigationId }: { investigationId: stri
       setComparison(c);
       setTests(t);
       setError(null);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load verification.");
+      return false;
     }
   }, [investigationId]);
 
@@ -79,13 +84,7 @@ export function VerificationSection({ investigationId }: { investigationId: stri
   }, [load]);
 
   const live = runs?.some((run) => run.status === "queued" || run.status === "running") ?? false;
-  React.useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void load();
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [live, load]);
+  usePolling(live, load, { baseMs: 5000 });
 
   function openForm() {
     setActionError(null);
@@ -104,6 +103,7 @@ export function VerificationSection({ investigationId }: { investigationId: stri
     try {
       await createVerificationRun(investigationId, { selected_check_keys: selected });
       setFormOpen(false);
+      toast.success("Verification run queued.");
       void load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not queue a new run.");

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import {
   approvePatch,
   discardPatch,
@@ -51,6 +52,7 @@ export function PatchesSection({
   investigationId: string;
   onChanged?: () => void;
 }) {
+  const toast = useToast();
   const [patches, setPatches] = React.useState<Patch[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
@@ -107,6 +109,7 @@ export function PatchesSection({
       });
       setDeciding(null);
       setNote("");
+      toast.success("Patch approved and queued for application.");
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not approve.");
@@ -122,6 +125,7 @@ export function PatchesSection({
       await rejectPatch(patch.id, { reason: reason.trim() });
       setDeciding(null);
       setReason("");
+      toast.success("Patch rejected.");
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not reject.");
@@ -135,6 +139,7 @@ export function PatchesSection({
     setActionError(null);
     try {
       await discardPatch(patch.id);
+      toast.success("Patch discarded.");
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not discard.");
@@ -282,7 +287,7 @@ export function PatchesSection({
                         label="Approval note (optional)"
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
-                        placeholder="Why is this safe to apply?"
+                        placeholder="What did you check before approving?"
                         maxLength={500}
                       />
                       <div className="flex flex-wrap gap-2">

@@ -38,6 +38,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { usePolling } from "@/lib/usePolling";
 
 const STATUS_TONE: Record<InvestigationStatus, "success" | "info" | "warning" | "danger" | "neutral"> = {
   queued: "neutral",
@@ -84,6 +86,7 @@ function prettyStage(key: string): string {
 export default function InvestigationDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const toast = useToast();
   const [detail, setDetail] = React.useState<InvestigationDetail | null>(null);
   const [stages, setStages] = React.useState<InvestigationStage[] | null>(null);
   const [activity, setActivity] = React.useState<ActivityEvent[] | null>(null);
@@ -111,8 +114,10 @@ export default function InvestigationDetailPage() {
       setActivity(a);
       setEvidence(e);
       setHypotheses(h);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load this investigation.");
+      return false;
     }
   }, [id]);
 
@@ -134,13 +139,8 @@ export default function InvestigationDetailPage() {
     };
   }, []);
 
-  React.useEffect(() => {
-    if (detail === null || !LIVE.includes(detail.status)) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void load();
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [detail, load]);
+  const live = detail !== null && LIVE.includes(detail.status);
+  usePolling(live, load, { baseMs: 4000 });
 
   async function onCancel() {
     setWorking(true);
@@ -148,6 +148,7 @@ export default function InvestigationDetailPage() {
     try {
       const updated = await cancelInvestigation(id);
       setDetail((prev) => (prev === null ? prev : { ...prev, ...updated }));
+      toast.success("Cancellation requested.");
       void load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not cancel.");
@@ -163,6 +164,7 @@ export default function InvestigationDetailPage() {
     try {
       const updated = await retryInvestigation(id, { from_stage: retryStage, reason: retryReason });
       setDetail((prev) => (prev === null ? prev : { ...prev, ...updated }));
+      toast.success("Retry queued.");
       setRetryReason("");
       void load();
     } catch (err) {

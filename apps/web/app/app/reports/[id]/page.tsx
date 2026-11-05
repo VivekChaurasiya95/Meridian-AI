@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { usePolling } from "@/lib/usePolling";
 import {
   MeridianApiError,
   formatBytes,
@@ -46,8 +47,10 @@ export default function ReportDetailPage() {
     try {
       setReport(await getReport(id));
       setError(null);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load this report.");
+      return false;
     }
   }, [id]);
 
@@ -55,13 +58,8 @@ export default function ReportDetailPage() {
     void load();
   }, [load]);
 
-  React.useEffect(() => {
-    if (report === null || (report.status !== "queued" && report.status !== "running")) return;
-    const timer = setInterval(() => {
-      if (document.visibilityState !== "hidden") void load();
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [report, load]);
+  const live = report !== null && (report.status === "queued" || report.status === "running");
+  usePolling(live, load, { baseMs: 4000 });
 
   async function onDownload() {
     if (report === null) return;

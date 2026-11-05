@@ -140,6 +140,27 @@ class Settings(BaseSettings):
     patch_max_diff_kb: int = Field(default=200, ge=1, le=2048)
     patch_diff_inline_kb: int = Field(default=64, ge=1, le=1024)
 
+    # Meta Llama provider (Slices 2-3). Disabled by default: the app
+    # keeps working and reasoning stages block honestly until an operator
+    # sets META_API_KEY and operator-verified model IDs. Never log keys.
+    meta_enabled: bool = False
+    meta_provider: str = ""
+    meta_base_url: str = ""
+    meta_api_key: str = ""
+    meta_model_default: str = ""
+    meta_model_reasoning: str = ""
+    meta_model_fast: str = ""
+    meta_model_report: str = ""
+    meta_request_timeout: int = Field(default=60, ge=5, le=600)
+    meta_max_retries: int = Field(default=3, ge=1, le=10)
+    meta_max_concurrent_requests: int = Field(default=4, ge=1, le=64)
+    meta_max_input_tokens: int = Field(default=32000, ge=512, le=200000)
+    meta_max_output_tokens: int = Field(default=4096, ge=64, le=32768)
+    ai_default_provider: str = "existing"
+    ai_fallback_enabled: bool = False
+    ai_log_request_metadata: bool = True
+    ai_log_prompt_content: bool = False
+
     @property
     def upload_max_bytes(self) -> int:
         return self.upload_max_mb * 1024 * 1024

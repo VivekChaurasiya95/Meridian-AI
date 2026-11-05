@@ -38,6 +38,7 @@ import {
   DropdownSeparator,
 } from "@/components/ui/Dropdown";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
 type LoadState =
@@ -87,19 +88,21 @@ function ProjectRow({
   onChanged: (project: Project) => void;
   onRemoved: (id: string) => void;
 }) {
+  const toast = useToast();
   const [busy, setBusy] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const canManage = project.role === "owner" || project.role === "admin";
   const canDelete = project.role === "owner";
 
-  async function run(action: () => Promise<Project | void>, remove = false) {
+  async function run(action: () => Promise<Project | void>, success: string, remove = false) {
     setBusy(true);
     setActionError(null);
     try {
       const result = await action();
       if (remove) onRemoved(project.id);
       else if (result) onChanged(result as Project);
+      toast.success(success);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "The action failed.");
     } finally {
@@ -193,18 +196,30 @@ function ProjectRow({
               </DropdownLink>
               <DropdownSeparator />
               {project.status === "active" && canManage && (
-                <DropdownItem onSelect={() => void run(() => archiveProject(project.id))}>
+                <DropdownItem
+                  onSelect={() =>
+                    void run(() => archiveProject(project.id), `Project “${project.name}” archived.`)
+                  }
+                >
                   <Archive aria-hidden="true" className="size-4" /> Archive project
                 </DropdownItem>
               )}
               {project.status === "archived" && canManage && (
-                <DropdownItem onSelect={() => void run(() => unarchiveProject(project.id))}>
+                <DropdownItem
+                  onSelect={() =>
+                    void run(() => unarchiveProject(project.id), `Project “${project.name}” restored.`)
+                  }
+                >
                   <ArchiveRestore aria-hidden="true" className="size-4" /> Restore project
                 </DropdownItem>
               )}
               {canDelete &&
                 (confirmDelete ? (
-                  <DropdownItem onSelect={() => void run(() => deleteProject(project.id), true)}>
+                  <DropdownItem
+                    onSelect={() =>
+                      void run(() => deleteProject(project.id), `Project “${project.name}” deleted.`, true)
+                    }
+                  >
                     <Trash2 aria-hidden="true" className="size-4 text-danger" />
                     <span className="font-semibold text-danger">Confirm delete</span>
                   </DropdownItem>

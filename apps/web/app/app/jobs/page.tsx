@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { usePolling } from "@/lib/usePolling";
 import { cn } from "@/lib/cn";
 
 const POLL_MS = 5000;
@@ -49,6 +51,7 @@ function statusLabel(status: JobStatus): string {
 }
 
 function JobRow({ job, onChanged }: { job: Job; onChanged: (job: Job) => void }) {
+  const toast = useToast();
   const [open, setOpen] = React.useState(false);
   const [stages, setStages] = React.useState<JobStage[] | null>(null);
   const [stagesError, setStagesError] = React.useState<string | null>(null);
@@ -83,6 +86,7 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: (job: Job) => void })
     setActionError(null);
     try {
       onChanged(await cancelJob(job.id));
+      toast.success("Job cancellation requested.");
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not cancel the job.");
     } finally {
@@ -271,6 +275,7 @@ export default function JobsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceParam = searchParams.get("workspace");
+  const toast = useToast();
 
   const [workspaces, setWorkspaces] = React.useState<Workspace[] | null>(null);
   const [workspaceId, setWorkspaceId] = React.useState<string | null>(workspaceParam);
@@ -315,12 +320,14 @@ export default function JobsPage() {
         setItems(page.items);
         setNextCursor(page.page.next_cursor);
         if (!silent) setError(null);
+        return true;
       } catch (err) {
         if (err instanceof MeridianApiError && err.status === 401) {
           router.push("/login?next=%2Fapp%2Fjobs");
-          return;
+          return false;
         }
         if (!silent) setError(err instanceof Error ? err.message : "Could not load jobs.");
+        return false;
       } finally {
         setLoading(false);
       }
@@ -332,9 +339,13 @@ export default function JobsPage() {
     if (!workspaceId) return;
     setLoading(true);
     void refresh(workspaceId, statusFilter, false);
-    const timer = setInterval(() => void refresh(workspaceId, statusFilter, true), POLL_MS);
-    return () => clearInterval(timer);
   }, [workspaceId, statusFilter, refresh]);
+
+  const poll = React.useCallback(
+    () => (workspaceId ? refresh(workspaceId, statusFilter, true) : undefined),
+    [workspaceId, statusFilter, refresh],
+  );
+  usePolling(workspaceId !== null, poll, { baseMs: POLL_MS });
 
   async function handleSubmitTest() {
     if (!workspaceId) return;
@@ -347,6 +358,7 @@ export default function JobsPage() {
         idempotency_key: `console-${Date.now()}`,
       });
       setItems((current) => [job, ...current]);
+      toast.success("Test job submitted.");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not submit the job.");
     } finally {
