@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
 
 type LoadState =
   | { status: "loading" }
@@ -35,6 +36,7 @@ export default function WorkspaceDetailPage() {
   const id = params.id;
   const router = useRouter();
   const { user } = useAuth();
+  const toast = useToast();
   const [state, setState] = React.useState<LoadState>({ status: "loading" });
   const [name, setName] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -76,6 +78,7 @@ export default function WorkspaceDetailPage() {
     try {
       const workspace = await updateWorkspace(id, { name: name.trim() });
       setState({ status: "ready", workspace });
+      toast.success(`Workspace renamed to “${workspace.name}”.`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Could not rename the workspace.");
     } finally {

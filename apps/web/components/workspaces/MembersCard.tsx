@@ -142,6 +142,7 @@ export function MembersCard({
     try {
       await removeMember(workspaceId, member.user_id);
       setMembers((current) => (current ? current.filter((m) => m.user_id !== member.user_id) : current));
+      toast.success(`${member.display_name ?? member.email ?? "Member"} removed.`);
       setArmedRemove(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not remove the member.");
