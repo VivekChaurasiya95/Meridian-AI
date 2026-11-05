@@ -110,8 +110,8 @@ class FakeContainer:
         return b"repro ok\n" if stdout else b""
 
     def get_archive(self, path):  # type: ignore[no-untyped-def]
-        assert path == "/tmp/meridian-out"
-        return iter([self._out_tar]), {"name": "meridian-out"}
+        assert path == "/work/Meridian.rules/out"
+        return iter([self._out_tar]), {"name": "out"}
 
 
 class FakeContainers:
@@ -144,10 +144,46 @@ class FakeImages:
         self.removed.append(kwargs)
 
 
+class FakeVolume:
+    def __init__(self, name: str, labels: dict) -> None:
+        self.name = name
+        self.attrs = {"Labels": dict(labels)}
+        self.removed = False
+
+    def remove(self, force: bool = False) -> None:
+        assert force
+        self.removed = True
+
+
+class FakeVolumes:
+    def __init__(self) -> None:
+        self.created: list = []
+
+    def create(self, name=None, labels=None):  # type: ignore[no-untyped-def]
+        volume = FakeVolume(name, labels or {})
+        self.created.append(volume)
+        return volume
+
+    def get(self, name):  # type: ignore[no-untyped-def]
+        for volume in self.created:
+            if volume.name == name and not volume.removed:
+                return volume
+
+        class _NotFound(Exception):
+            pass
+
+        _NotFound.__name__ = "NotFound"
+        raise _NotFound(name)
+
+    def list(self, filters=None):  # type: ignore[no-untyped-def]
+        return [v for v in self.created if not v.removed]
+
+
 class FakeClient:
     def __init__(self, container: FakeContainer) -> None:
         self.containers = FakeContainers(container)
         self.images = FakeImages()
+        self.volumes = FakeVolumes()
 
     def ping(self) -> None:
         return None

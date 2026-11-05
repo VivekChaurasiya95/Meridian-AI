@@ -183,6 +183,60 @@ def test_create_forwards_spec_kwargs() -> None:
     assert client.containers.created_kwargs == spec
 
 
+class FakeVolume:
+    def __init__(self, name: str, labels: dict) -> None:
+        self.name = name
+        self.attrs = {"Labels": dict(labels)}
+        self.removed = False
+
+    def remove(self, force: bool = False) -> None:
+        assert force
+        self.removed = True
+
+
+class FakeVolumes:
+    def __init__(self) -> None:
+        self.created: list = []
+
+    def create(self, name=None, labels=None):  # type: ignore[no-untyped-def]
+        volume = FakeVolume(name, labels or {})
+        self.created.append(volume)
+        return volume
+
+    def get(self, name):  # type: ignore[no-untyped-def]
+        for volume in self.created:
+            if volume.name == name and not volume.removed:
+                return volume
+
+        class _NotFound(Exception):
+            pass
+
+        _NotFound.__name__ = "NotFound"
+        raise _NotFound(name)
+
+
+class FakeVolumeClient:
+    def __init__(self) -> None:
+        self.volumes = FakeVolumes()
+
+
+def test_create_output_volume_carries_managed_labels() -> None:
+    client = FakeVolumeClient()
+    volume = container_runtime.create_output_volume(
+        client, "meridian-out-abc", {"meridian.managed": "true"}
+    )
+    assert volume.name == "meridian-out-abc"
+    assert volume.attrs["Labels"]["meridian.managed"] == "true"
+
+
+def test_remove_volume_reports_missing_as_clean() -> None:
+    client = FakeVolumeClient()
+    assert container_runtime.remove_volume(client, "meridian-out-gone") == "removed"
+    client.volumes.create("meridian-out-x", {})
+    assert container_runtime.remove_volume(client, "meridian-out-x") == "removed"
+    assert container_runtime.remove_volume(client, "meridian-out-x") == "removed"
+
+
 def test_run_success_returns_exit_code() -> None:
     container = FakeContainer(exit_code=0, exit_after=2)
     result = container_runtime.run_to_completion(container, 30, poll_interval=0.001)

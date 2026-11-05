@@ -142,13 +142,53 @@ class FakeImages:
         self.removed.append(kwargs)
 
 
+class FakeVolume:
+    def __init__(self, name: str, labels: dict) -> None:
+        self.name = name
+        self.attrs = {"Labels": dict(labels)}
+        self.removed = False
+
+    def remove(self, force: bool = False) -> None:
+        assert force
+        self.removed = True
+
+
+class FakeVolumes:
+    def __init__(self, available=None) -> None:  # type: ignore[no-untyped-def]
+        self.available = list(available or [])
+        self.created: list = []
+
+    def create(self, name=None, labels=None):  # type: ignore[no-untyped-def]
+        volume = FakeVolume(name, labels or {})
+        self.created.append(volume)
+        return volume
+
+    def get(self, name):  # type: ignore[no-untyped-def]
+        for volume in self.created + self.available:
+            if volume.name == name and not volume.removed:
+                return volume
+
+        class _NotFound(Exception):
+            pass
+
+        _NotFound.__name__ = "NotFound"
+        raise _NotFound(name)
+
+    def list(self, filters=None):  # type: ignore[no-untyped-def]
+        known = list(self.available) + [v for v in self.created if not v.removed]
+        wanted = (filters or {}).get("label", "")
+        key, _, value = wanted.partition("=")
+        return [v for v in known if v.attrs["Labels"].get(key) == value] if key else known
+
+
 class FakeClient:
-    def __init__(self, containers) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, containers, volumes=None) -> None:  # type: ignore[no-untyped-def]
         if isinstance(containers, FakeContainers):
             self.containers = containers
         else:
             self.containers = FakeContainers(containers)
         self.images = FakeImages()
+        self.volumes = volumes if isinstance(volumes, FakeVolumes) else FakeVolumes(volumes)
 
     def ping(self) -> None:
         return None
@@ -541,6 +581,77 @@ def test_prune_removes_stale_containers(
     assert plain.removed is False
 
 
+def test_prune_removes_stale_volumes(
+    auth_client: TestClient,
+    db_session: Session,
+    db_session_factory,  # type: ignore[no-untyped-def]
+    fake_store: FakeObjectStore,
+) -> None:
+    _w, _p, snapshot, _job = _setup_job(auth_client, "prv")
+    claimed = job_service.claim_job(db_session, "w-prv", ("sandbox_smoke",), 60)
+    assert claimed is not None
+    job_id = uuid.UUID(claimed["id"])
+    live_id = uuid.uuid4().hex
+    stale_id = uuid.uuid4().hex
+    session = db_session_factory()
+    try:
+        lifecycle.create_execution(
+            session,
+            execution_id=uuid.UUID(hex=live_id),
+            job_id=job_id,
+            worker_id="w-prv",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"],
+        )
+        lifecycle.create_execution(
+            session,
+            execution_id=uuid.UUID(hex=stale_id),
+            job_id=job_id,
+            worker_id="w-prv",
+            snapshot_id=uuid.UUID(snapshot["id"]),
+            profile="sandbox_smoke",
+            attempt=claimed["attempts"] + 1,
+        )
+        lifecycle.finish_execution(
+            session,
+            uuid.UUID(hex=stale_id),
+            status="failed",
+            error_code="COMMAND_FAILED",
+            error_message="boom",
+        )
+    finally:
+        session.close()
+    live = FakeVolume(
+        "meridian-out-live",
+        {"meridian.managed": "true", "meridian.execution_id": live_id},
+    )
+    stale = FakeVolume(
+        "meridian-out-stale",
+        {"meridian.managed": "true", "meridian.execution_id": stale_id},
+    )
+    ghost = FakeVolume(
+        "meridian-out-ghost",
+        {"meridian.managed": "true", "meridian.execution_id": "c" * 32},
+    )
+    plain = FakeVolume("user-data", {})
+    client = FakeClient([], FakeVolumes([live, stale, ghost, plain]))
+
+    def is_live(execution_id: str) -> bool:
+        check = db_session_factory()
+        try:
+            return lifecycle.is_execution_live(check, uuid.UUID(hex=execution_id))
+        finally:
+            check.close()
+
+    result = lifecycle.prune_stale_volumes(client, is_live)
+    assert result == {"pruned": 2, "kept": 1, "failed": 0}
+    assert live.removed is False
+    assert stale.removed is True
+    assert ghost.removed is True
+    assert plain.removed is False
+
+
 def test_is_running_and_owned(auth_client: TestClient, db_session: Session) -> None:
     workspace = make_workspace(auth_client, "wsown")
     project = make_project(auth_client, workspace["id"], "own")
@@ -718,7 +829,15 @@ def test_recovery_idempotent(
     # Model daemon truth: destroyed containers vanish from later listings.
     containers.available = [c for c in containers.available if not c.removed]
     second = lifecycle.recover_orphans(db_session_factory, client)
-    assert second == {"pruned": 0, "kept": 0, "failed": 0, "pruned_ids": []}
+    assert second == {
+        "pruned": 0,
+        "kept": 0,
+        "failed": 0,
+        "pruned_ids": [],
+        "volumes_pruned": 0,
+        "volumes_kept": 0,
+        "volumes_failed": 0,
+    }
 
 
 def test_recovery_db_outage_keeps_containers(

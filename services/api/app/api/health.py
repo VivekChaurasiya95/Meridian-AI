@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import check_database, get_engine
-from app.services.model_gateway import get_configured_provider
+from app.ai.providers import resolve_text_provider
 from app.services.object_store import MinioObjectStore
 
 router = APIRouter(tags=["system"])
@@ -66,11 +66,13 @@ def check_model_provider() -> str:
     """Reasoning backend: ok / not_configured / unavailable.
 
     Never raises and never leaks keys, endpoints, or model names.
-    ``not_configured`` (the default ``fake`` provider) means reasoning
-    stages block honestly until an operator configures a real backend.
+    Resolves through the same gateway the worker uses
+    (Meta Spark > Meta Llama > existing), so the badge agrees with
+    the pipeline. ``not_configured`` means reasoning stages block
+    honestly until an operator configures a real backend.
     """
     try:
-        config = get_configured_provider()
+        config = resolve_text_provider()
     except Exception:
         return "unavailable"
     return "ok" if config.configured else "not_configured"

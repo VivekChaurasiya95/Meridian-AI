@@ -121,7 +121,7 @@ _GITLEAKS = ExecutionPolicy(
 # Browser reproduction (M6). Fixed argv: the trusted repro script plus a
 # server-validated steps file, both baked in as reserved extras. The
 # script serves the snapshot on container loopback and drives headless
-# Chromium; findings land in /tmp/meridian-out for bounded extraction.
+# Chromium; findings land on the per-execution output volume for extraction.
 _REPRO = ExecutionPolicy(
     profile="browser_repro",
     # Maintainer-built base (repro-base.Dockerfile): upstream ships the

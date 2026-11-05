@@ -70,9 +70,8 @@ def build_spec(
             raise SandboxError(
                 "INVALID_VOLUME", "Only plain named volumes may be mounted."
             )
-    return {
+    spec = {
         "image": image or policy.image,
-        "volumes": dict(volumes or {}),
         "command": list(policy.command),
         "name": f"{_NAME_PREFIX}{execution_id[:12]}",
         "working_dir": policy.workdir,
@@ -101,3 +100,6 @@ def build_spec(
         },
         "detach": True,
     }
+    if volumes:
+        spec["volumes"] = dict(volumes)
+    return spec

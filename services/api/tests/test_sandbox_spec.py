@@ -124,6 +124,23 @@ def test_spec_labels_carry_execution_identity() -> None:
     assert spec["name"].startswith("meridian-sandbox-")
 
 
+def test_spec_volumes_opt_in_for_named_output_volumes() -> None:
+    policy = execution_policy.get_policy("browser_repro")
+    mapping = {"meridian-out-abc123": {"bind": "/work/Meridian.rules", "mode": "rw"}}
+    spec = container_spec.build_spec(policy, EXECUTION_ID, volumes=mapping)
+    assert spec["volumes"] == mapping
+
+
+def test_spec_rejects_bind_mount_sources() -> None:
+    policy = execution_policy.get_policy("browser_repro")
+    for bad in ("/host/data", "C:\\data", "../escape", "name:withcolon", ""):
+        with pytest.raises(SandboxError) as exc_info:
+            container_spec.build_spec(
+                policy, EXECUTION_ID, volumes={bad: {"bind": "/out", "mode": "rw"}}
+            )
+        assert exc_info.value.code == "INVALID_VOLUME"
+
+
 def test_spec_rejects_bad_execution_id() -> None:
     policy = execution_policy.get_policy("sandbox_smoke")
     for bad in ("", "root", "A" * 32, "z" * 32, "../../etc"):

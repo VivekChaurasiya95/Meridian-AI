@@ -204,12 +204,12 @@ def test_model_check_reports_configured_state(monkeypatch: pytest.MonkeyPatch) -
     from app.services.model_gateway import ProviderConfig
 
     monkeypatch.setattr(
-        health_module, "get_configured_provider", lambda: ProviderConfig(configured=False)
+        health_module, "resolve_text_provider", lambda: ProviderConfig(configured=False)
     )
     assert health_module.check_model_provider() == "not_configured"
     monkeypatch.setattr(
         health_module,
-        "get_configured_provider",
+        "resolve_text_provider",
         lambda: ProviderConfig(configured=True, provider=None),
     )
     assert health_module.check_model_provider() == "ok"
@@ -217,7 +217,7 @@ def test_model_check_reports_configured_state(monkeypatch: pytest.MonkeyPatch) -
     def _boom() -> ProviderConfig:
         raise RuntimeError("settings broken")
 
-    monkeypatch.setattr(health_module, "get_configured_provider", _boom)
+    monkeypatch.setattr(health_module, "resolve_text_provider", _boom)
     assert health_module.check_model_provider() == "unavailable"
 
 
