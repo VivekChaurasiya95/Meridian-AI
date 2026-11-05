@@ -6,9 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Query
 from fastapi.responses import JSONResponse
 
-from app.api.deps import CurrentUser, DbSession, RequestId
+from app.api.deps import CurrentUser, DbSession, RequestId, write_limiter
 from app.config import get_settings
-from app.envelope import ok, paged
+from app.envelope import ApiError, ok, paged
 from app.schemas import (
     HypothesisReviewUpdate,
     InvestigationCreate,
@@ -59,6 +59,23 @@ def list_investigations(
     effective_limit = min(limit or settings.page_default_limit, settings.page_max_limit)
     items, next_cursor = investigation_service.list_investigations(
         session, user, project_id, effective_limit, cursor, status, severity
+    )
+    return paged(items, effective_limit, next_cursor, request_id)
+
+
+@router.get("/api/v1/workspaces/{workspace_id}/investigations")
+def list_workspace_investigations(
+    workspace_id: uuid.UUID,
+    session: DbSession,
+    user: CurrentUser,
+    request_id: RequestId,
+    limit: int = Query(default=25, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=512),
+) -> JSONResponse:
+    settings = get_settings()
+    effective_limit = min(limit or settings.page_default_limit, settings.page_max_limit)
+    items, next_cursor = investigation_service.list_workspace_investigations(
+        session, user, workspace_id, effective_limit, cursor
     )
     return paged(items, effective_limit, next_cursor, request_id)
 
@@ -158,6 +175,11 @@ def review_hypothesis(
     user: CurrentUser,
     request_id: RequestId,
 ) -> JSONResponse:
+    rate_key = f"write:{user.id}"
+    limiter = write_limiter()
+    if not limiter.allowed(rate_key):
+        raise ApiError(429, "RATE_LIMITED", "Too many requests. Try again later.")
+    limiter.register_failure(rate_key)
     data = hypothesis_service.review_hypothesis(
         session, user, hypothesis_id, payload.verdict, payload.note, request_id
     )

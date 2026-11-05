@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     upload_rate_max: int = Field(default=20, ge=1, le=1000)
     upload_rate_window_seconds: int = Field(default=3600, ge=60, le=86400)
 
+    # Write rate limiting (security T5, same dev-scale sliding window as
+    # login/uploads per D20): per-user caps on the mutating routes that
+    # otherwise let one caller queue unbounded verification reruns,
+    # reports, downloads, and hypothesis reviews.
+    write_rate_max: int = Field(default=60, ge=1, le=1000)
+    write_rate_window_seconds: int = Field(default=3600, ge=60, le=86400)
+
     # Durable jobs (M4). Lease/heartbeat follow D10 (60s TTL default).
     worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
     worker_heartbeat_seconds: int = Field(default=20, ge=5, le=600)

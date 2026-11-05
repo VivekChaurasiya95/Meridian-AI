@@ -25,6 +25,7 @@ from app.models import (
     RepositorySnapshot,
     ToolRun,
     User,
+    WorkspaceMember,
 )
 from app.schemas import InvestigationCreate, InvestigationRetry
 from app.services import activity as activity_service
@@ -371,6 +372,50 @@ def list_investigations(
         stmt = stmt.where(Investigation.status == status)
     if severity is not None:
         stmt = stmt.where(Investigation.severity == severity)
+    if cursor:
+        position = decode_cursor(cursor)
+        if position is None:
+            raise ApiError(422, "VALIDATION_ERROR", "The cursor is invalid.")
+        stamp, cursor_id = position
+        stmt = stmt.where(
+            or_(
+                Investigation.created_at < stamp,
+                and_(Investigation.created_at == stamp, Investigation.id < cursor_id),
+            )
+        )
+    rows = list(session.execute(stmt.limit(limit + 1)).scalars())
+    items = rows[:limit]
+    next_cursor = None
+    if len(rows) > limit:
+        last = items[-1]
+        next_cursor = encode_cursor(last.created_at, last.id)
+    return [serialize_investigation(row, role) for row in items], next_cursor
+
+
+def list_workspace_investigations(
+    session: Session,
+    user: User,
+    workspace_id: uuid.UUID,
+    limit: int,
+    cursor: str | None,
+) -> tuple[list[dict], str | None]:
+    """Newest-first investigations across one workspace (for /app/investigations)."""
+    role = (
+        session.execute(
+            select(WorkspaceMember.role).where(
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if role is None:
+        raise not_found("workspace")
+    stmt = (
+        select(Investigation)
+        .join(Project, Project.id == Investigation.project_id)
+        .where(Project.workspace_id == workspace_id)
+        .order_by(desc(Investigation.created_at), desc(Investigation.id))
+    )
     if cursor:
         position = decode_cursor(cursor)
         if position is None:

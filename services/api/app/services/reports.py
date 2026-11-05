@@ -763,14 +763,17 @@ def generate_pending(
     return results
 
 
-def list_reports(session: Session, user: User, investigation_id: uuid.UUID) -> list[dict]:
-    """Newest-first file reports for one investigation."""
+def list_reports(
+    session: Session, user: User, investigation_id: uuid.UUID, limit: int = 50
+) -> list[dict]:
+    """Newest-first file reports for one investigation (capped, security T5)."""
     inv, _role = investigation_access(session, user, investigation_id)
     rows = list(
         session.execute(
             select(Report)
             .where(Report.investigation_id == inv.id)
             .order_by(desc(Report.created_at), desc(Report.id))
+            .limit(limit)
         ).scalars()
     )
     return [serialize_file_report(row) for row in rows]

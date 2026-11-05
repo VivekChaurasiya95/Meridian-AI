@@ -35,6 +35,7 @@ import type {
   UploadResult,
   User,
   VerificationComparison,
+  VerificationComparisonRow,
   VerificationRun,
   Workspace,
 } from "./types";
@@ -552,6 +553,18 @@ export async function listInvestigations(
   return data;
 }
 
+export async function listWorkspaceInvestigations(
+  workspaceId: string,
+  options?: { limit?: number; cursor?: string | null },
+): Promise<{ items: Investigation[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const { data, page } = await apiFetch<Investigation[]>(
+    `/api/v1/workspaces/${workspaceId}/investigations?${params}`,
+  );
+  return { items: data, page: page ?? { limit: 25, next_cursor: null } };
+}
+
 export async function getInvestigation(id: string): Promise<InvestigationDetail> {
   const { data } = await apiFetch<InvestigationDetail>(`/api/v1/investigations/${id}`);
   return data;
@@ -709,10 +722,12 @@ export async function createVerificationRun(
 export async function getVerificationComparison(
   investigationId: string,
 ): Promise<VerificationComparison> {
-  const { data } = await apiFetch<VerificationComparison>(
+  // The endpoint returns the paged test rows; the caller already knows
+  // which investigation it asked for, so echo it back into the shape.
+  const { data } = await apiFetch<VerificationComparisonRow[]>(
     `/api/v1/investigations/${investigationId}/verification-comparison`,
   );
-  return data;
+  return { investigation_id: investigationId, tests: data };
 }
 
 export async function listReports(investigationId: string): Promise<Report[]> {

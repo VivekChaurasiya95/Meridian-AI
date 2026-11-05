@@ -467,14 +467,17 @@ def adopt_queued_run(
     return {"run_id": row.id, "selected_check_keys": selected, "planned_total": planned_total}
 
 
-def comparison(session: Session, user: User, investigation_id: uuid.UUID) -> dict:
-    """Baseline-vs-post-patch results per regression test (M9)."""
+def comparison(
+    session: Session, user: User, investigation_id: uuid.UUID, limit: int = 25
+) -> dict:
+    """Baseline-vs-post-patch results per regression test (M9, capped)."""
     inv, _role = investigation_access(session, user, investigation_id)
     tests = list(
         session.execute(
             select(RegressionTest)
             .where(RegressionTest.investigation_id == inv.id)
             .order_by(RegressionTest.created_at.asc(), RegressionTest.id.asc())
+            .limit(limit)
         ).scalars()
     )
     latest: dict[tuple[uuid.UUID, str], dict] = {}
@@ -516,14 +519,17 @@ def comparison(session: Session, user: User, investigation_id: uuid.UUID) -> dic
     }
 
 
-def list_runs(session: Session, user: User, investigation_id: uuid.UUID) -> list[dict]:
-    """Newest-first runs with their check detail."""
+def list_runs(
+    session: Session, user: User, investigation_id: uuid.UUID, limit: int = 25
+) -> list[dict]:
+    """Newest-first runs with their check detail (capped, security T5)."""
     inv, _role = investigation_access(session, user, investigation_id)
     runs = list(
         session.execute(
             select(VerificationRun)
             .where(VerificationRun.investigation_id == inv.id)
             .order_by(VerificationRun.created_at.desc(), VerificationRun.id.desc())
+            .limit(limit)
         ).scalars()
     )
     if not runs:

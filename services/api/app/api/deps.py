@@ -30,6 +30,12 @@ def upload_limiter() -> SlidingWindowLimiter:
     return SlidingWindowLimiter(settings.upload_rate_max, settings.upload_rate_window_seconds)
 
 
+@lru_cache(maxsize=1)
+def write_limiter() -> SlidingWindowLimiter:
+    settings = get_settings()
+    return SlidingWindowLimiter(settings.write_rate_max, settings.write_rate_window_seconds)
+
+
 def get_request_id(request: Request) -> str:
     """Resolve the request ID: middleware-attached state first, then header.
 
