@@ -34,8 +34,16 @@ logger = logging.getLogger("meridian.investigation.browser")
 
 SCRIPT_EXTRA = "Meridian.rules/repro.py"
 STEPS_EXTRA = "Meridian.rules/steps.json"
-OUT_PATH = "/tmp/meridian-out"
+# Deliverables live on a per-execution named volume (never the /tmp tmpfs:
+# tmpfs is unmounted on container stop, so outputs would be unreadable).
+# The volume mounts at the rules dir itself: the daemon initializes it
+# from the image's 65534-owned repro.py/steps.json, so the non-root user
+# can write the out/ subdirectory. Snapshot data can never collide here
+# (reserved root).
+VOLUME_MOUNT_PATH = "/work/Meridian.rules"
+OUT_PATH = "/work/Meridian.rules/out"
 RESULT_FILE = "result.json"
+VOLUME_NAME_PREFIX = "meridian-out-"
 
 _JSON_EVIDENCE = {"console.json": "log", "network.json": "network_summary"}
 _KNOWN_FILE = re.compile(
@@ -181,6 +189,7 @@ def run_browser_repro(
     container: Any = None
     own_client: Any = client
     image_tag: str | None = None
+    volume_name: str | None = None
     finished = False
 
     try:
@@ -216,7 +225,22 @@ def run_browser_repro(
         except SandboxError as exc:
             raise _map_sandbox_error(exc) from exc
         try:
-            spec = build_spec(policy, execution_id, image=image_tag)
+            volume_name = f"{VOLUME_NAME_PREFIX}{execution_id[:12]}"
+            container_runtime.create_output_volume(
+                own_client, volume_name,
+                {
+                    "meridian.managed": "true",
+                    "meridian.execution_id": execution_id,
+                    "meridian.profile": policy.profile,
+                },
+            )
+        except SandboxError as exc:
+            raise _map_sandbox_error(exc) from exc
+        try:
+            spec = build_spec(
+                policy, execution_id, image=image_tag,
+                volumes={volume_name: {"bind": VOLUME_MOUNT_PATH, "mode": "rw"}},
+            )
             container = container_runtime.create_container(own_client, spec)
             run = container_runtime.run_to_completion(
                 container, limit_seconds, should_abort=_aborted
@@ -227,6 +251,33 @@ def run_browser_repro(
             raise _map_sandbox_error(exc) from exc
         try:
             logs = container_runtime.read_logs(container, policy.max_output_bytes)
+            if run["timed_out"]:
+                _finish_tool("timed_out", {"duration_ms": run["duration_ms"]})
+                _finish_execution(
+                    session_factory, execution_uuid, status="timed_out",
+                    exit_code=run["exit_code"], timed_out=True,
+                    duration_ms=run["duration_ms"],
+                    stdout=logs["stdout"], stderr=logs["stderr"],
+                    truncated=logs["truncated"],
+                    error=("COMMAND_TIMEOUT", "Reproduction exceeded its time limit."),
+                )
+                finished = True
+                raise InvestigationFailure(
+                    "COMMAND_TIMEOUT", "Reproduction exceeded its time limit.", True
+                )
+            if run["exit_code"] != 0:
+                _finish_tool("failed", {"exit_code": run["exit_code"]})
+                _finish_execution(
+                    session_factory, execution_uuid, status="failed",
+                    exit_code=run["exit_code"], duration_ms=run["duration_ms"],
+                    stdout=logs["stdout"], stderr=logs["stderr"],
+                    truncated=logs["truncated"],
+                    error=("REPRO_CONTAINER_FAILED", f"Exit code {run['exit_code']}."),
+                )
+                finished = True
+                raise InvestigationFailure(
+                    "REPRO_CONTAINER_FAILED", f"Exit code {run['exit_code']}.", True
+                )
             extracted = container_runtime.read_files(
                 container, OUT_PATH,
                 max_files=settings.evidence_max_files,
@@ -239,33 +290,6 @@ def run_browser_repro(
         finally:
             if image_tag is not None:
                 container_runtime.remove_image(own_client, image_tag)
-        if run["timed_out"]:
-            _finish_tool("timed_out", {"duration_ms": run["duration_ms"]})
-            _finish_execution(
-                session_factory, execution_uuid, status="timed_out",
-                exit_code=run["exit_code"], timed_out=True,
-                duration_ms=run["duration_ms"],
-                stdout=logs["stdout"], stderr=logs["stderr"],
-                truncated=logs["truncated"],
-                error=("COMMAND_TIMEOUT", "Reproduction exceeded its time limit."),
-            )
-            finished = True
-            raise InvestigationFailure(
-                "COMMAND_TIMEOUT", "Reproduction exceeded its time limit.", True
-            )
-        if run["exit_code"] != 0:
-            _finish_tool("failed", {"exit_code": run["exit_code"]})
-            _finish_execution(
-                session_factory, execution_uuid, status="failed",
-                exit_code=run["exit_code"], duration_ms=run["duration_ms"],
-                stdout=logs["stdout"], stderr=logs["stderr"],
-                truncated=logs["truncated"],
-                error=("REPRO_CONTAINER_FAILED", f"Exit code {run['exit_code']}."),
-            )
-            finished = True
-            raise InvestigationFailure(
-                "REPRO_CONTAINER_FAILED", f"Exit code {run['exit_code']}.", True
-            )
         files: dict[str, bytes] = extracted["files"]
         raw_result = files.get(RESULT_FILE)
         if raw_result is None:
@@ -350,6 +374,13 @@ def run_browser_repro(
             status = container_runtime.destroy_container(container)
             with session_factory() as session:
                 update_cleanup(session, execution_uuid, status)
+        if volume_name is not None:
+            volume_status = container_runtime.remove_volume(own_client, volume_name)
+            if volume_status != "removed":
+                logger.warning(
+                    "output volume cleanup failed execution_id=%s status=%s",
+                    execution_uuid, volume_status,
+                )
         if ws_dir is not None:
             workspace.destroy_workspace(ws_dir)
 

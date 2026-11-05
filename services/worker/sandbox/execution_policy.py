@@ -124,7 +124,10 @@ _GITLEAKS = ExecutionPolicy(
 # Chromium; findings land in /tmp/meridian-out for bounded extraction.
 _REPRO = ExecutionPolicy(
     profile="browser_repro",
-    image="mcr.microsoft.com/playwright/python:v1.49.0-jammy",
+    # Maintainer-built base (repro-base.Dockerfile): upstream ships the
+    # browsers but not the playwright Python package, and per-execution
+    # builds are RUN-free, so the pinned package is baked in once here.
+    image="meridian/repro-base:1.49.0",
     command=("python", "/work/Meridian.rules/repro.py"),
     env={"HOME": "/tmp", "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"},
     timeout_seconds=600,

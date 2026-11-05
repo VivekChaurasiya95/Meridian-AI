@@ -3,8 +3,8 @@
 The worker bakes this file plus a server-validated ``steps.json`` into
 the per-execution image as reserved extras. It serves the snapshot on
 container loopback, drives headless Chromium through the scripted
-steps, and writes findings to ``/tmp/meridian-out`` for bounded
-extraction. Nothing here is caller-controlled: argv, paths, ports, and
+steps, and writes findings to ``/work/Meridian.rules/out`` (a
+per-execution named volume) for bounded extraction. Nothing here is caller-controlled: argv, paths, ports, and
 browser flags are all fixed constants.
 
 Assertion convention (documented, user-visible): scripted assertions
@@ -34,7 +34,7 @@ import urllib.parse
 
 STEPS_PATH = "/work/Meridian.rules/steps.json"
 APP_ROOT = "/work"
-OUT_DIR = "/tmp/meridian-out"
+OUT_DIR = "/work/Meridian.rules/out"
 APP_HOST = "127.0.0.1"
 APP_PORT = 8077
 SERVER_WAIT_SECONDS = 30

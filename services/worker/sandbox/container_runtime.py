@@ -113,6 +113,43 @@ def remove_image(client: Any, tag: str) -> str:
         return "image_cleanup_failed"
 
 
+def create_output_volume(client: Any, name: str, labels: dict) -> Any:
+    """Create one per-execution named output volume (M6 repro deliverables).
+
+    Named volumes (never host binds) survive container stop, unlike the
+    /tmp tmpfs — container file outputs are unreadable otherwise.
+    """
+    try:
+        return client.volumes.create(name=name, labels=dict(labels))
+    except Exception as exc:
+        raise SandboxError(
+            "VOLUME_CREATE_FAILED",
+            "The output volume could not be created.",
+            retryable=True,
+        ) from exc
+
+
+def remove_volume(client: Any, name: str) -> str:
+    """Remove an output volume. Never raises: returns the cleanup status."""
+    try:
+        volume = client.volumes.get(name)
+        volume.remove(force=True)
+        return "removed"
+    except Exception:
+        try:
+            return "removed" if _volume_missing(client, name) else "volume_cleanup_failed"
+        except Exception:
+            return "volume_cleanup_failed"
+
+
+def _volume_missing(client: Any, name: str) -> bool:
+    try:
+        client.volumes.get(name)
+    except Exception as exc:
+        return type(exc).__name__ == "NotFound"
+    return False
+
+
 def run_to_completion(
     container: Any,
     timeout_seconds: int,
