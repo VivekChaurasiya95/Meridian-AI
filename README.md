@@ -57,9 +57,22 @@ one centralized AI gateway (`services/api/app/ai/` + `app/services/model_gateway
 with task-based routing, token budgets, secret redaction, and metadata-only
 telemetry:
 
-- **Meta Spark (text/reasoning)** — first-choice provider for investigation planning, root-cause analysis, report generation, and summarization, invoked over the same chat-completions transport as every other provider.
-- **Meta Llama (OpenAI-compatible)** — operator-configured fallback via `META_BASE_URL` / `META_API_KEY` / `META_MODEL_*`, with tiered routing (fast extraction vs. deep reasoning, never silent downgrade).
-- **Meta SAM (image segmentation)** — worker-only evidence screenshot analysis path with fail-closed validation (transport enables after endpoint verification).
+- **Meta Spark (text/reasoning)** — first-choice provider, set via `META_SPARK_BASE_URL` / `META_SPARK_API_KEY` / `META_SPARK_MODEL`. Handles every text task below through the same OpenAI-compatible chat-completions transport (retries, timeouts, token accounting in one place).
+- **Meta Llama (OpenAI-compatible)** — fallback when Spark is off, set via `META_BASE_URL` / `META_API_KEY` / `META_MODEL_DEFAULT` / `META_MODEL_REASONING` / `META_MODEL_FAST` / `META_MODEL_REPORT`. Resolution order is Spark → Llama → existing provider; critical tasks never silently downgrade to a weaker tier.
+- **Meta SAM (image segmentation)** — worker-only evidence-screenshot path, set via `META_SAM_*`. Fail-closed: validates the request and blocks honestly until the endpoint is operator-verified.
+
+| Task | Tier | Used for |
+|---|---|---|
+| Investigation planning, complex reasoning, root-cause analysis *(critical — no downgrade)* | reasoning | Planning the debug strategy, deep causal analysis |
+| Security interpretation, remediation suggestion, report generation | reasoning | Explaining scanner findings, proposing fixes, writing the final report |
+| Repository analysis, investigation chat | fast | Codebase orientation, Q&A over the investigation |
+| Document summarization, structured extraction | fast | Summaries, pulling structured fields from evidence |
+| Vision segmentation, image understanding | fast | SAM evidence-image analysis (worker-only) |
+
+Every call is schema-validated, secret-redacted, and token-budgeted
+(`META_REQUEST_TIMEOUT`, `META_MAX_RETRIES`, per-task input/output caps).
+With no keys configured, each provider raises `MODEL_PROVIDER_UNAVAILABLE`
+and reasoning stages block honestly instead of fabricating output.
 
 Honest-by-design: deterministic scanners (Semgrep/Gitleaks) remain the source of
 findings — models never invent scan results — and everything ships
