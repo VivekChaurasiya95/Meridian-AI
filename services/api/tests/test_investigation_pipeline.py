@@ -984,6 +984,42 @@ def test_failed_verification_fails_honestly(
         session.close()
 
 
+def test_second_leg_resolves_default_stores(
+    auth_client: TestClient,
+    db_session_factory,
+    fake_store: FakeObjectStore,  # type: ignore[no-untyped-def]
+) -> None:
+    """Production worker passes store=None; defaults must resolve.
+
+    The fixture points every default at the fake, so this proves the
+    apply leg never dereferences a None store (live-probe regression).
+    """
+    import hashlib
+
+    env, _claimed = _park_first_leg(auth_client, db_session_factory, fake_store, "gate7")
+    inv_id = env["inv"]["id"]
+    patch = auth_client.get(f"/api/v1/investigations/{inv_id}/patches").json()["data"][0]
+    approved = auth_client.post(
+        f"/api/v1/patches/{patch['id']}/approve",
+        json={
+            "diff_sha256": hashlib.sha256(PATCH_DIFF.encode()).hexdigest(),
+            "base_snapshot_id": env["snapshot"]["id"],
+        },
+    )
+    assert approved.status_code == 202, approved.text
+    claimed = _claim(db_session_factory)
+    client = FakeClient(FakeContainer(_out_tar(reproduced=False)))
+    outcome = run_investigation(db_session_factory, claimed, "w-pipe", client=client)
+    assert outcome["status"] == "completed"
+    session: Session = db_session_factory()
+    try:
+        row = session.get(Patch, uuid.UUID(patch["id"]))
+        assert row is not None and row.status == "verification_passed"
+        assert row.applied_snapshot_id is not None
+    finally:
+        session.close()
+
+
 def test_reject_completes_without_apply(
     auth_client: TestClient,
     db_session_factory,

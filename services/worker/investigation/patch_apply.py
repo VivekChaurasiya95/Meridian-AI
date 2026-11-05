@@ -84,12 +84,15 @@ def apply_patch_to_snapshot(
             if exc.code in ("LEASE_LOST", "JOB_SUPERSEDED"):
                 raise InvestigationAbort() from exc
             raise InvestigationFailure(exc.code, exc.message, False) from exc
+    # Snapshot creation needs a concrete store; resolve the operator
+    # default when the caller did not inject one (production worker).
+    active_store = store if store is not None else storage_service.get_store()
     workdir = tempfile.mkdtemp(prefix="meridian-patch-apply-")
     try:
         with session_factory() as session:
             try:
                 materialized = storage_service.materialize_for_workspace(
-                    session, workspace_id, base_snapshot_id, workdir, store=store
+                    session, workspace_id, base_snapshot_id, workdir, store=active_store
                 )
             except ApiError as exc:
                 raise InvestigationFailure(exc.code, exc.message, False) from exc
@@ -102,7 +105,7 @@ def apply_patch_to_snapshot(
                 snapshot = _snapshot_patched_tree(
                     session, project=project, source_dir=workdir,
                     base_snapshot_id=base_snapshot_id, patch_id=patch_id,
-                    base_digest=materialized["tree_digest"], store=store,
+                    base_digest=materialized["tree_digest"], store=active_store,
                 )
             except ApiError as exc:
                 if exc.code in ("LEASE_LOST", "JOB_SUPERSEDED"):
