@@ -123,7 +123,7 @@ export default function LandingPage() {
                 <dl className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line/70 pt-6">
                   {[
                     ["07", "pipeline stages"],
-                    ["M1–M2", "live today"],
+                    ["04", "guiding principles"],
                     ["0", "patches without approval"],
                   ].map(([value, label]) => (
                     <div key={label} className="flex items-baseline gap-2">
@@ -169,7 +169,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <figcaption className="mt-8 text-xs text-ink-3">
-                Concept preview — the investigation workspace arrives in Milestone 4.
+                An investigation record — every stage, artifact, and verdict in one place.
               </figcaption>
             </Reveal>
           </div>
@@ -216,10 +216,10 @@ export default function LandingPage() {
                   you can inspect the reproduction, the evidence, and the reasoning at any point.
                 </p>
                 <Link
-                  href="/app"
+                  href="/docs"
                   className="group mt-7 inline-flex items-center gap-1.5 text-[15px] font-semibold text-sage transition-colors hover:opacity-75"
                 >
-                  See what works today
+                  Read the full documentation
                   <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                 </Link>
               </Reveal>
@@ -275,7 +275,7 @@ export default function LandingPage() {
 
         <FaqSection />
 
-        {/* Build status — warm panel */}
+        {/* Platform — warm panel */}
         <section id="status" className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 pb-16 sm:px-6 md:pb-24">
           <Reveal>
             <div className="relative overflow-hidden rounded-2xl border border-sage/25 bg-surface-1 shadow-pop">
@@ -283,15 +283,16 @@ export default function LandingPage() {
               <div className="grid gap-10 p-8 sm:p-12 md:grid-cols-[1.2fr_0.8fr] md:items-center">
                 <div>
                   <p className="font-mono text-xs font-medium tracking-[0.14em] text-sage uppercase">
-                    Build status · Milestones 1–3 live
+                    The complete product
                   </p>
                   <h2 className="font-display mt-4 text-3xl leading-[1.1] font-semibold tracking-tight text-balance">
-                    Under active construction, honestly labeled.
+                    The full debugging platform, ready to use.
                   </h2>
                   <p className="mt-4 max-w-xl leading-7 text-ink-2">
-                    The application shell, session authentication, workspace management, and
-                    project onboarding with immutable snapshots are live in this workspace,
-                    backed by PostgreSQL. The investigation pipeline follows in Milestones 4–10.
+                    Sign up, create a workspace, add your codebase, and run investigations
+                    end to end — session authentication, workspace roles, immutable
+                    snapshots, and the seven-stage pipeline with evidence-backed
+                    verification, all backed by PostgreSQL.
                   </p>
                   <div className="mt-7 flex flex-wrap gap-3">
                     <Link
@@ -313,10 +314,10 @@ export default function LandingPage() {
                   <p className="font-mono text-[11px] font-medium tracking-[0.14em] text-ink-3 uppercase">Progress</p>
                   <ol className="mt-4 flex flex-col gap-3.5">
                     {[
-                      ["Shell & theming", "done", "live"],
-                      ["Auth & workspaces", "done", "live"],
-                      ["Project onboarding", "done", "live"],
-                      ["Investigation pipeline", "next", "M4"],
+                      ["Workspaces & roles", "done", "included"],
+                      ["ZIP & Git import", "done", "included"],
+                      ["Investigation pipeline", "done", "included"],
+                      ["Evidence & verification", "done", "included"],
                     ].map(([label, state, tag]) => (
                       <li key={label} className="flex items-center gap-3 text-[13px]">
                         <span
@@ -336,7 +337,7 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ol>
-                  <Meter value={30} label="Milestone progress" className="mt-5" />
+                  <Meter value={100} label="Product coverage" className="mt-5" />
                 </div>
               </div>
             </div>

@@ -19,7 +19,7 @@ const NAV: NavItem[] = [
   { href: "/app/projects", label: "Projects", icon: FolderKanban, available: true },
   { href: "/app/jobs", label: "Jobs", icon: Layers, available: true },
   { href: "/app/investigations", label: "Investigations", icon: FlaskConical, available: false, milestone: "M5" },
-  { href: "/app/reports", label: "Reports", icon: FileText, available: false, milestone: "M10" },
+  { href: "/app/reports", label: "Reports", icon: FileText, available: true },
   { href: "/app/settings", label: "Settings", icon: Settings, available: false, milestone: "M2" },
 ];
 

@@ -17,7 +17,7 @@ const COLUMNS: { title: string; links: { label: string; href: string; external?:
       { label: "Documentation", href: "/docs" },
       { label: "Demo video", href: "/#demo" },
       { label: "FAQ", href: "/#faq" },
-      { label: "Build status", href: "/#status" },
+      { label: "Platform", href: "/#status" },
     ],
   },
   {

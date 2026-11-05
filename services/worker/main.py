@@ -43,6 +43,8 @@ from sandbox import container_runtime as sandbox_runtime  # noqa: E402
 from sandbox import lifecycle as sandbox_lifecycle  # noqa: E402
 from sandbox import orchestrator as sandbox_orchestrator  # noqa: E402
 from sandbox.exceptions import SandboxError  # noqa: E402
+from security import preflight as preflight_runner
+from security.preflight import PreflightFailure
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +58,8 @@ SAFE_JOB_TYPES = (
     "sandbox_smoke",
     "git_preview",
     "git_import",
+    "security_preflight",
+    "investigation",
 )
 
 _stop = False
@@ -245,12 +249,79 @@ def handle_git_import(session: Session, job: dict, worker_id: str) -> dict:
     return _handle_git(session, job, worker_id, False)
 
 
+def handle_security_preflight(session: Session, job: dict, worker_id: str) -> dict:
+    """Run the preflight entry; map its failures onto the job lifecycle.
+
+    Lease loss and cancellation abort the run through the watch below;
+    completion refusal in ``complete_job`` is the final backstop.
+    """
+    job_id = uuid.UUID(job["id"])
+
+    def abort_on_lease_loss() -> bool:
+        try:
+            with session_scope() as check:
+                return not job_service.is_running_and_owned(check, job_id, worker_id)
+        except Exception:  # noqa: BLE001 — the watch must never break a run
+            logger.warning("lease watch failed job_id=%s", job_id)
+            return False
+
+    settings = get_settings()
+    try:
+        return preflight_runner.run_preflight(
+            get_session_factory(),
+            job,
+            worker_id,
+            is_cancelled=abort_on_lease_loss,
+            image_overrides={
+                "semgrep": settings.preflight_semgrep_image,
+                "gitleaks": settings.preflight_gitleaks_image,
+            },
+        )
+    except PreflightFailure as exc:
+        raise JobFailure(exc.code, exc.message, exc.retryable) from None
+
+
+def handle_investigation(session: Session, job: dict, worker_id: str) -> dict:
+    """Run the M6 investigation pipeline; map failures onto the job."""
+    from investigation import InvestigationAbort, InvestigationFailure
+    from investigation.pipeline import run_investigation
+
+    job_id = uuid.UUID(job["id"])
+
+    def abort_on_lease_loss() -> bool:
+        try:
+            with session_scope() as check:
+                return not job_service.is_running_and_owned(check, job_id, worker_id)
+        except Exception:
+            logger.warning("lease watch failed job_id=%s", job_id)
+            return False
+
+    del session
+    try:
+        return run_investigation(
+            get_session_factory(), job, worker_id, is_cancelled=abort_on_lease_loss
+        )
+    except InvestigationFailure as exc:
+        raise JobFailure(exc.code, exc.message, exc.retryable) from None
+    except InvestigationAbort:
+        # Backstop (the pipeline normally absorbs aborts itself): cancel,
+        # never fail, a cooperatively stopped job.
+        try:
+            with session_scope() as scope:
+                job_service.cancel_job_as_worker(scope, job_id, worker_id)
+        except ApiError as exc:
+            logger.warning("worker cancel refused job_id=%s code=%s", job_id, exc.code)
+        return {"cancelled": True}
+
+
 HANDLERS = {
     "lifecycle_test": handle_lifecycle_test,
     "manifest_recheck": handle_manifest_recheck,
     "sandbox_smoke": handle_sandbox_smoke,
     "git_preview": handle_git_preview,
     "git_import": handle_git_import,
+    "security_preflight": handle_security_preflight,
+    "investigation": handle_investigation,
 }
 
 

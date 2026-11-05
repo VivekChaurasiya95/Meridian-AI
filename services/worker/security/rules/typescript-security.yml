@@ -1,0 +1,32 @@
+# Meridian preflight ruleset (preflight-v1): TypeScript.
+# Pattern-only rules (no taint mode): deterministic, fast, offline.
+rules:
+  - id: meridian-ts-eval
+    languages: [typescript]
+    severity: ERROR
+    message: Dynamic code execution with eval() can run attacker-controlled code.
+    metadata:
+      category: code-execution
+      confidence: HIGH
+    patterns:
+      - pattern: eval(...)
+
+  - id: meridian-ts-innerhtml
+    languages: [typescript]
+    severity: WARNING
+    message: Assigning innerHTML with untrusted data may allow cross-site scripting.
+    metadata:
+      category: xss
+      confidence: MEDIUM
+    patterns:
+      - pattern: $EL.innerHTML = ...
+
+  - id: meridian-ts-exec-concat
+    languages: [typescript]
+    severity: ERROR
+    message: Shell command built with string concatenation may allow command injection.
+    metadata:
+      category: injection
+      confidence: MEDIUM
+    patterns:
+      - pattern: $CP.exec($A + $B, ...)

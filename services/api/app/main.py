@@ -9,7 +9,24 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
-from app.api import auth, git_imports, health, jobs, members, projects, users, workspaces
+from app.api import (
+    audit,
+    auth,
+    evidence,
+    executions,
+    git_imports,
+    health,
+    investigations,
+    jobs,
+    members,
+    patches,
+    projects,
+    reports,
+    security,
+    users,
+    verification,
+    workspaces,
+)
 from app.config import get_settings
 from app.envelope import (
     REQUEST_ID_HEADER,
@@ -52,7 +69,19 @@ def create_app() -> FastAPI:
         # never a wildcard (D19).
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", REQUEST_ID_HEADER],
+        # Idempotency-Key is required: the web client sends it on
+        # investigation creation, and a missing entry fails the preflight
+        # with 400 (surfacing as a CORS error with no usable message).
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            REQUEST_ID_HEADER,
+            "Idempotency-Key",
+        ],
+        # The client reads X-Request-ID off every response for error
+        # correlation; cross-origin reads need an explicit expose list.
+        expose_headers=[REQUEST_ID_HEADER],
     )
 
     @application.exception_handler(ApiError)
@@ -90,6 +119,14 @@ def create_app() -> FastAPI:
     application.include_router(projects.router)
     application.include_router(git_imports.router)
     application.include_router(jobs.router)
+    application.include_router(security.router)
+    application.include_router(executions.router)
+    application.include_router(investigations.router)
+    application.include_router(evidence.router)
+    application.include_router(audit.router)
+    application.include_router(patches.router)
+    application.include_router(verification.router)
+    application.include_router(reports.router)
     return application
 
 

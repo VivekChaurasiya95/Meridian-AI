@@ -34,16 +34,26 @@ def storage_key_for_digest(object_sha256: str) -> str:
     return f"snapshots/{object_sha256[:2]}/{object_sha256}.tar"
 
 
+def security_key_for_digest(object_sha256: str) -> str:
+    """Content-addressed key for the security scan input (D62).
+
+    Same digest scheme under ``snapshots/security/`` so the existing
+    orphan scan prefix keeps covering it; caller validates the shape.
+    """
+    return f"snapshots/security/{object_sha256[:2]}/{object_sha256}.tar"
+
+
 class ObjectStore(Protocol):
     """Minimal surface the pipeline needs (fakeable in pure tests)."""
 
     def ensure_bucket(self, bucket: str) -> None: ...
-    def put_file(self, bucket: str, key: str, path: str) -> int: ...
+    def put_file(self, bucket: str, key: str, path: str, content_type: str = ...) -> int: ...
     def get_bytes(self, bucket: str, key: str) -> bytes: ...
     def download_file(self, bucket: str, key: str, path: str) -> None: ...
     def object_exists(self, bucket: str, key: str) -> bool: ...
     def delete_object(self, bucket: str, key: str) -> None: ...
     def list_objects(self, bucket: str, prefix: str) -> list[tuple[str, int]]: ...
+    def generate_download_url(self, bucket: str, key: str, expires_seconds: int) -> str: ...
 
 
 class MinioObjectStore:
@@ -84,16 +94,32 @@ class MinioObjectStore:
         except Exception as exc:
             raise self._wrap("unavailable", bucket) from exc
 
-    def put_file(self, bucket: str, key: str, path: str) -> int:
+    def put_file(self, bucket: str, key: str, path: str, content_type: str = TAR_MIME) -> int:
         try:
             self.ensure_bucket(bucket)
-            self._client.upload_file(path, bucket, key, ExtraArgs={"ContentType": TAR_MIME})
+            self._client.upload_file(path, bucket, key, ExtraArgs={"ContentType": content_type})
             head = self._client.head_object(Bucket=bucket, Key=key)
             return int(head.get("ContentLength", 0))
         except StorageError:
             raise
         except Exception as exc:
             raise self._wrap("upload", key) from exc
+
+    def generate_download_url(self, bucket: str, key: str, expires_seconds: int) -> str:
+        """Short-lived signed GET URL. Callers must authorize first and must
+        never log the URL."""
+        if expires_seconds <= 0:
+            raise StorageError("INVALID_TTL", "The URL expiry must be positive.")
+        try:
+            return str(
+                self._client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": bucket, "Key": key},
+                    ExpiresIn=expires_seconds,
+                )
+            )
+        except Exception as exc:
+            raise self._wrap("presign", key) from exc
 
     def get_bytes(self, bucket: str, key: str) -> bytes:
         import botocore.exceptions
@@ -178,12 +204,18 @@ class FakeObjectStore:
     def ensure_bucket(self, bucket: str) -> None:
         self._maybe_fail()
 
-    def put_file(self, bucket: str, key: str, path: str) -> int:
+    def put_file(self, bucket: str, key: str, path: str, content_type: str = TAR_MIME) -> int:
         self._maybe_fail()
         with open(path, "rb") as handle:
             data = handle.read()
         self.objects[f"{bucket}/{key}"] = data
         return len(data)
+
+    def generate_download_url(self, bucket: str, key: str, expires_seconds: int) -> str:
+        self._maybe_fail()
+        if expires_seconds <= 0:
+            raise StorageError("INVALID_TTL", "The URL expiry must be positive.")
+        return f"https://evidence.invalid/{bucket}/{key}?expires_in={expires_seconds}"
 
     def get_bytes(self, bucket: str, key: str) -> bytes:
         self._maybe_fail()

@@ -7,7 +7,10 @@
   },
   "scripts": {
     "dev": "next dev --port 3010",
+    "predev": "node scripts/clean-stale-next.js",
     "build": "next build",
+    "prebuild": "node scripts/clean-stale-next.js --force",
+    "clean": "node scripts/clean-stale-next.js --force",
     "start": "next start --port 3010",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

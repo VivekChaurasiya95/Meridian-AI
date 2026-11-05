@@ -268,6 +268,10 @@ def test_upload_creates_snapshot_and_indexes_files(auth_client: TestClient) -> N
         "stored",
         "snapshot_created",
     ]
+    for stage in body["inspection"]["stages"]:
+        assert stage["status"] == "completed"
+        assert stage["finished_at"]
+        assert stage["detail"]
 
     detail = auth_client.get(f"/api/v1/projects/{project['id']}").json()["data"]
     assert detail["snapshot_count"] == 1
@@ -348,6 +352,27 @@ def test_snapshots_are_immutable(auth_client: TestClient) -> None:
     assert auth_client.patch(f"/api/v1/snapshots/{snapshot['id']}", json={}).status_code == 405
     assert auth_client.delete(f"/api/v1/snapshots/{snapshot['id']}").status_code == 405
     assert auth_client.get(f"/api/v1/snapshots/{snapshot['id']}").status_code == 200
+
+
+def test_delete_project_with_snapshot_and_job_detaches_jobs(auth_client: TestClient) -> None:
+    """Deleting a project with snapshots + jobs must return 204, not 500.
+
+    Regression: jobs.project_id is RESTRICT, so delete failed with an
+    IntegrityError (DELETE 500 in the UI) whenever a job referenced the
+    project. Jobs are workspace history: they are detached, not removed.
+    """
+    workspace = make_workspace(auth_client, "wsdeljob")
+    project = make_project(auth_client, workspace["id"], "doomed")
+    snapshot = upload(auth_client, project["id"], "a.zip", DEMO_ZIP).json()["data"]["snapshot"]
+    job = auth_client.post(
+        f"/api/v1/workspaces/{workspace['id']}/jobs",
+        json={"job_type": "sandbox_smoke", "payload": {"snapshot_id": snapshot["id"]}},
+    )
+    assert job.status_code == 201, job.text
+
+    deleted = auth_client.delete(f"/api/v1/projects/{project['id']}")
+    assert deleted.status_code == 204, deleted.text
+    assert auth_client.get(f"/api/v1/projects/{project['id']}").status_code == 404
 
 
 def test_tree_and_file_guards(auth_client: TestClient) -> None:

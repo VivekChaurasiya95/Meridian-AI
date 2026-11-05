@@ -38,12 +38,11 @@ evidence, hypothesize, test, patch, verify, report — with a human approving ev
 - [📄 License](#-license)
 - [👨‍💻 Author](#-author)
 
-> **Milestone 3 status (this checkout):** everything from Milestone 2, plus
-> project management — ZIP upload with hostile-archive validation, static stack
-> inspection, immutable snapshots, repository browsing, and project settings.
-> The investigation pipeline (execution, browser reproduction, AI reasoning,
-> patches, verification) arrives in later milestones. The UI never presents unbuilt
-> stages as real.
+> **Milestone 8 status (this checkout):** everything from Milestone 6, plus
+> evidence-grounded hypotheses (M7) and regression tests with baseline/post-patch
+> verification plus patch proposals behind scoped human approval (M8).
+> Verification reruns/comparison and reporting (M9–M10) are still ahead.
+> The UI never presents unbuilt stages as real.
 
 Spec authority: `SECURITY.md` > PRD > `ARCHITECTURE.md`/`API.md` > `DATABASE.md` >
 `DESIGN_SYSTEM.md` > `IMPLEMENTATION_PLAN.md`. Conflicts and resolutions live in
@@ -267,9 +266,9 @@ npx playwright install --with-deps chromium   # first time only
 npm run e2e
 ```
 
-Current coverage: **76 backend tests** (auth, sessions, Firebase exchange, members,
-workspaces, request IDs) and **9 e2e specs** (landing, auth forms, password toggles,
-theme, API-base units).
+Current coverage: **590 backend tests** (auth through investigations, hypotheses,
+regression tests, patches, verification) and **9 e2e specs** (landing, auth forms,
+password toggles, theme, API-base units).
 
 ## 🗺️ Roadmap
 
@@ -277,8 +276,11 @@ theme, API-base units).
 - [x] **M2** — Session auth (password + Firebase social), workspaces, membership roles
 - [x] **M3** — Project onboarding (ZIP validation, inspection, snapshots), MinIO reserved for M3+ evidence
 - [x] **M4** — Durable jobs + leases/recovery + worker (ruff/mypy/pytest + lint/typecheck/build green)
-- [ ] **M5** — Isolated execution worker (sandbox)
-- [ ] **M6–M10** — Browser reproduction, AI reasoning, patches, verification, reporting
+- [x] **M5** — Isolated execution worker (sandbox smoke profile + execution observability; project-specific profiles future)
+- [x] **M6** — Investigations, browser reproduction (static profile), evidence + audit
+- [x] **M7** — Evidence-grounded hypotheses via a provider adapter (fake default blocks honestly)
+- [x] **M8** — Regression tests, baseline/post-patch verification, patch proposals with scoped human approval
+- [ ] **M9–M10** — Verification reruns/comparison, reporting
 
 ## 📄 License
 

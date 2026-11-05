@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-recorded-m7-0001",
+  "object": "chat.completion",
+  "created": 1798765432,
+  "model": "recorded-reasoner-v1",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"hypotheses\": [{\"title\": \"Submit handler never enables the button\", \"description\": \"Console shows no click handler errors but the button stays disabled, matching the form-state defect in app.js.\", \"confidence\": 0.72, \"evidence_refs\": [{\"evidence_id\": \"REPLACE_WITH_REAL_ID\", \"relationship\": \"supports\", \"note\": \"final screenshot shows disabled button\"}]}]}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 812, "completion_tokens": 96, "total_tokens": 908}
+}

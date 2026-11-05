@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 from app.envelope import ApiError
 from app.services import jobs as job_service
+from app.services.redact import redact_text
 from app.services import projects as project_service
 from app.services import storage as storage_service
 from sandbox import container_runtime, workspace
@@ -209,6 +210,10 @@ def execute_job(
             )
         out_text, out_cut = _excerpt(logs["stdout"])
         err_text, err_cut = _excerpt(logs["stderr"])
+        # Job results are API-visible: redact before they leave the worker
+        # (row persistence redacts again in finish_execution; idempotent).
+        out_text = redact_text(out_text) or ""
+        err_text = redact_text(err_text) or ""
         truncated = out_cut or err_cut or logs["truncated"]
         _finish(session_factory, execution_uuid, status="completed",
                 exit_code=0, duration_ms=run["duration_ms"],

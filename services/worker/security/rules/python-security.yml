@@ -1,0 +1,66 @@
+# Meridian preflight ruleset (preflight-v1): Python.
+# Pattern-only rules (no taint mode): deterministic, fast, offline.
+# Findings are advisory; severity follows the Meridian mapping.
+rules:
+  - id: meridian-python-eval-exec
+    languages: [python]
+    severity: ERROR
+    message: Dynamic code execution with eval() or exec() can run attacker-controlled code.
+    metadata:
+      category: code-execution
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+
+  - id: meridian-python-subprocess-shell
+    languages: [python]
+    severity: ERROR
+    message: Subprocess invoked with shell=True can execute injected shell commands.
+    metadata:
+      category: injection
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.run(..., shell=True, ...)
+          - pattern: subprocess.call(..., shell=True, ...)
+          - pattern: subprocess.Popen(..., shell=True, ...)
+          - pattern: subprocess.check_output(..., shell=True, ...)
+
+  - id: meridian-python-pickle-loads
+    languages: [python]
+    severity: ERROR
+    message: Unpickling untrusted data can execute arbitrary code during deserialization.
+    metadata:
+      category: deserialization
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: pickle.loads(...)
+          - pattern: pickle.load(...)
+
+  - id: meridian-python-sql-format
+    languages: [python]
+    severity: ERROR
+    message: SQL query built with string formatting may allow SQL injection; use parameters.
+    metadata:
+      category: injection
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $CUR.execute("..." % ...)
+          - pattern: $CUR.execute("...".format(...))
+
+  - id: meridian-python-hardcoded-password
+    languages: [python]
+    severity: ERROR
+    message: Possible hardcoded credential assigned in source; move secrets out of code.
+    metadata:
+      category: credentials
+      confidence: MEDIUM
+    patterns:
+      - pattern: $PASS = "..."
+      - metavariable-regex:
+          metavariable: $PASS
+          regex: (?i).*(password|passwd|pwd|secret|api_key|apikey|token).*

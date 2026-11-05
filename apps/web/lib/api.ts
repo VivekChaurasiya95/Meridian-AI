@@ -1,21 +1,41 @@
 /** Typed API client for the Meridian backend (envelope-aware). */
 
 import type {
+  ActivityEvent,
   AssignableRole,
+  DownloadUrl,
   ErrorDetail,
+  EvidenceArtifact,
   FilePreview,
   HealthChecks,
+  Hypothesis,
+  HypothesisReview,
+  HypothesisVerdict,
+  Investigation,
+  InvestigationDetail,
+  InvestigationSeverity,
+  InvestigationStage,
+  InvestigationStatus,
   Job,
   JobStage,
   Member,
   PageInfo,
+  Patch,
+  PatchApproval,
+  PatchDiff,
   Project,
   ProjectsSummary,
+  RegressionTest,
+  Report,
+  ReportFormat,
+  SandboxExecution,
   SnapshotDetail,
   SnapshotSummary,
   TreeListing,
   UploadResult,
   User,
+  VerificationComparison,
+  VerificationRun,
   Workspace,
 } from "./types";
 
@@ -480,6 +500,261 @@ export async function cancelJob(id: string): Promise<Job> {
 export async function getJobStages(id: string): Promise<JobStage[]> {
   const { data } = await apiFetch<{ stages: JobStage[] }>(`/api/v1/jobs/${id}/stages`);
   return data.stages;
+}
+
+export async function listJobExecutions(jobId: string): Promise<SandboxExecution[]> {
+  const { data } = await apiFetch<{ executions: SandboxExecution[] }>(
+    `/api/v1/jobs/${jobId}/executions`,
+  );
+  return data.executions;
+}
+
+export async function getExecution(id: string): Promise<SandboxExecution> {
+  const { data } = await apiFetch<SandboxExecution>(`/api/v1/executions/${id}`);
+  return data;
+}
+
+export interface InvestigationCreateInput {
+  title: string;
+  bug_report: string;
+  severity: InvestigationSeverity;
+  repository_snapshot_id: string;
+  reproduction_context?: { route?: string };
+}
+
+export async function createInvestigation(
+  projectId: string,
+  input: InvestigationCreateInput,
+  idempotencyKey?: string,
+): Promise<Investigation> {
+  const { data } = await apiFetch<Investigation>(
+    `/api/v1/projects/${projectId}/investigations`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+    },
+  );
+  return data;
+}
+
+export async function listInvestigations(
+  projectId: string,
+  params?: { status?: InvestigationStatus; severity?: InvestigationSeverity },
+): Promise<Investigation[]> {
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.severity) query.set("severity", params.severity);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  const { data } = await apiFetch<Investigation[]>(
+    `/api/v1/projects/${projectId}/investigations${suffix}`,
+  );
+  return data;
+}
+
+export async function getInvestigation(id: string): Promise<InvestigationDetail> {
+  const { data } = await apiFetch<InvestigationDetail>(`/api/v1/investigations/${id}`);
+  return data;
+}
+
+export async function cancelInvestigation(id: string): Promise<Investigation> {
+  const { data } = await apiFetch<Investigation>(`/api/v1/investigations/${id}/cancel`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function retryInvestigation(
+  id: string,
+  input: { from_stage: string; reason: string },
+): Promise<Investigation> {
+  const { data } = await apiFetch<Investigation>(`/api/v1/investigations/${id}/retry`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function getInvestigationStages(id: string): Promise<InvestigationStage[]> {
+  const { data } = await apiFetch<InvestigationStage[]>(`/api/v1/investigations/${id}/stages`);
+  return data;
+}
+
+export async function getInvestigationActivity(id: string): Promise<ActivityEvent[]> {
+  const { data } = await apiFetch<ActivityEvent[]>(`/api/v1/investigations/${id}/activity`);
+  return data;
+}
+
+export async function listInvestigationEvidence(id: string): Promise<EvidenceArtifact[]> {
+  const { data } = await apiFetch<EvidenceArtifact[]>(`/api/v1/investigations/${id}/evidence`);
+  return data;
+}
+
+export async function listHypotheses(id: string): Promise<Hypothesis[]> {
+  const { data } = await apiFetch<Hypothesis[]>(`/api/v1/investigations/${id}/hypotheses`);
+  return data;
+}
+
+export async function getHypothesis(id: string): Promise<Hypothesis> {
+  const { data } = await apiFetch<Hypothesis>(`/api/v1/hypotheses/${id}`);
+  return data;
+}
+
+export async function reviewHypothesis(
+  id: string,
+  input: { verdict: HypothesisVerdict; note?: string },
+): Promise<HypothesisReview> {
+  const { data } = await apiFetch<HypothesisReview>(`/api/v1/hypotheses/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function listRegressionTests(investigationId: string): Promise<RegressionTest[]> {
+  const { data } = await apiFetch<RegressionTest[]>(
+    `/api/v1/investigations/${investigationId}/regression-tests`,
+  );
+  return data;
+}
+
+export async function createRegressionTest(
+  investigationId: string,
+  input: {
+    title: string;
+    description?: string;
+    test_type?: string;
+    file_path?: string;
+    test_name?: string;
+  },
+): Promise<RegressionTest> {
+  const { data } = await apiFetch<RegressionTest>(
+    `/api/v1/investigations/${investigationId}/regression-tests`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return data;
+}
+
+export async function getRegressionTest(testId: string): Promise<RegressionTest> {
+  const { data } = await apiFetch<RegressionTest>(`/api/v1/regression-tests/${testId}`);
+  return data;
+}
+
+export async function listPatches(investigationId: string): Promise<Patch[]> {
+  const { data } = await apiFetch<Patch[]>(
+    `/api/v1/investigations/${investigationId}/patches`,
+  );
+  return data;
+}
+
+export async function getPatch(patchId: string): Promise<Patch> {
+  const { data } = await apiFetch<Patch>(`/api/v1/patches/${patchId}`);
+  return data;
+}
+
+export async function getPatchDiff(patchId: string): Promise<PatchDiff> {
+  const { data } = await apiFetch<PatchDiff>(`/api/v1/patches/${patchId}/diff`);
+  return data;
+}
+
+export async function approvePatch(
+  patchId: string,
+  input: { diff_sha256: string; base_snapshot_id: string; note?: string },
+): Promise<PatchApproval> {
+  const { data } = await apiFetch<PatchApproval>(`/api/v1/patches/${patchId}/approve`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function rejectPatch(patchId: string, input: { reason: string }): Promise<Patch> {
+  const { data } = await apiFetch<Patch>(`/api/v1/patches/${patchId}/reject`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function discardPatch(patchId: string): Promise<Patch> {
+  const { data } = await apiFetch<Patch>(`/api/v1/patches/${patchId}/discard`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function listVerificationRuns(investigationId: string): Promise<VerificationRun[]> {
+  const { data } = await apiFetch<VerificationRun[]>(
+    `/api/v1/investigations/${investigationId}/verification-runs`,
+  );
+  return data;
+}
+
+export async function getVerificationRun(runId: string): Promise<VerificationRun> {
+  const { data } = await apiFetch<VerificationRun>(`/api/v1/verification-runs/${runId}`);
+  return data;
+}
+
+export async function createVerificationRun(
+  investigationId: string,
+  input: { selected_check_keys?: string[] },
+): Promise<VerificationRun> {
+  const { data } = await apiFetch<VerificationRun>(
+    `/api/v1/investigations/${investigationId}/verification-runs`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return data;
+}
+
+export async function getVerificationComparison(
+  investigationId: string,
+): Promise<VerificationComparison> {
+  const { data } = await apiFetch<VerificationComparison>(
+    `/api/v1/investigations/${investigationId}/verification-comparison`,
+  );
+  return data;
+}
+
+export async function listReports(investigationId: string): Promise<Report[]> {
+  const { data } = await apiFetch<Report[]>(
+    `/api/v1/investigations/${investigationId}/reports`,
+  );
+  return data;
+}
+
+export async function listWorkspaceReports(workspaceId: string): Promise<Report[]> {
+  const { data } = await apiFetch<Report[]>(`/api/v1/workspaces/${workspaceId}/reports`);
+  return data;
+}
+
+export async function getReport(id: string): Promise<Report> {
+  const { data } = await apiFetch<Report>(`/api/v1/reports/${id}`);
+  return data;
+}
+
+export async function createReport(
+  investigationId: string,
+  input: { format: ReportFormat },
+): Promise<Report> {
+  const { data } = await apiFetch<Report>(`/api/v1/investigations/${investigationId}/reports`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function issueReportDownload(id: string): Promise<DownloadUrl> {
+  const { data } = await apiFetch<DownloadUrl>(`/api/v1/reports/${id}/download-url`, {
+    method: "POST",
+  });
+  return data;
+}
+
+export async function issueEvidenceDownload(id: string): Promise<DownloadUrl> {
+  const { data } = await apiFetch<DownloadUrl>(`/api/v1/evidence/${id}/download-url`, {
+    method: "POST",
+  });
+  return data;
 }
 
 export function formatBytes(bytes: number): string {

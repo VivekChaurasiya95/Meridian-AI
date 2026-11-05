@@ -140,3 +140,48 @@ No Git sources (option visibly disabled); synchronous ingestion; no
 browser automation, evidence pipeline, or AI stages; 5s polling, not
 SSE; "New investigation" buttons disabled until the pipeline exists;
 MinIO bucket empty and reserved.
+
+## 9. Security Preflight V1 — backend + read APIs (2026-11-04, D61-D67)
+
+Spec: `security.md` (V1 scope confirmed: Semgrep + Gitleaks, dual
+artifacts, sandbox profiles, durable job, read APIs; UI/OSV/hardening
+deferred). Migration is `008_security_preflight` (doc said 007, which
+git import occupies).
+
+Implemented: dual-artifact ingestion (`security_extra` tarball,
+`security_*` snapshot fields, read-back verify, mirror optimization
+for secret-less uploads); `materialize_security_input_for_workspace`
+(policy-based secret verification, worker-only); `security_preflight`
+job type end to end (submit validation, idempotent enqueue on ZIP
+upload, worker handler, 8 stages); `services/worker/security/`
+(wrappers with upstream-verified exit contracts, normalizer with
+detector-aware masking, risk policy, ruleset preflight-v1, scanner
+runner reusing sandbox primitives with zero stdout persistence);
+sandbox profiles `semgrep_preflight`/`gitleaks_preflight` (pinned
+`semgrep/semgrep:1.183.0` + `zricethezav/gitleaks:v8.30.1`, trusted
+FROM/rules-dir build parameters, `scanner` execution discriminator);
+4 read APIs (assessment detail, snapshot latest, project list,
+paginated/filtered findings); 97 maintained tests.
+
+Verified in-session: 71 pure unit tests green; ruff clean on all
+touched files (22 remaining hits are pre-existing worker regions);
+mypy clean on `app` (39 files); API/worker imports + app factory +
+migration chain check ok; full suite collects 432 tests.
+
+NOT verified (sandbox blocks loopback TCP to Postgres/MinIO/Docker):
+26 DB-backed preflight tests, migration 008 upgrade/downgrade,
+real-daemon scanner runs, semgrep rule validation. Required
+user-side (unsandboxed PowerShell, repo root):
+`$env:TEST_DATABASE_URL='postgresql+psycopg://meridian:meridian@localhost:5435/meridian_test';`
+`cd services/api; python -m pytest tests/ -q` (expect 0 failures;
+4 pre-existing TestClient tests fail only inside the sandbox);
+`alembic upgrade head` + `downgrade -1`/`upgrade head` on a scratch
+database for 008; `docker run --rm -v ${PWD}/services/worker/security/rules:/r:ro
+semgrep/semgrep:1.183.0 semgrep scan --validate --config /r` for
+rules; pull both scanner images before any live preflight job.
+
+Known follow-ups: Security UI (Phase 5 second half), OSV-Scanner
+(stub present), git-import snapshot trigger (V1 triggers on ZIP
+uploads only), enqueue outbox (enqueue failure currently fails the
+upload loudly per D65), repo ignore-file semantics documented as
+advisory-only (D67).

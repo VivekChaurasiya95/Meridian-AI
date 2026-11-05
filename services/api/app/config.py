@@ -84,6 +84,16 @@ class Settings(BaseSettings):
     git_import_max_file_mb: int = Field(default=25, ge=1, le=256)
     git_import_max_attempts: int = Field(default=2, ge=1, le=5)
 
+    # Security preflight (V1). Trusted operator configuration: API
+    # payloads can never override these. Image pins must stay explicit
+    # tags (never :latest); the sandbox validates the format again at
+    # execution time. Execution limits live in the sandbox profiles
+    # (code, change-controlled), not here.
+    preflight_enabled: bool = True
+    preflight_semgrep_image: str = "semgrep/semgrep:1.183.0"
+    preflight_gitleaks_image: str = "zricethezav/gitleaks:v8.30.1"
+    preflight_max_findings: int = Field(default=5000, ge=100, le=50000)
+
     # Immutable snapshot content storage (M5.1, private MinIO bucket).
     # NOTE for local runs: the host-mapped MinIO API port is 9010, so a
     # local .env needs S3_ENDPOINT_URL=http://localhost:9010 (the
@@ -93,6 +103,35 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_region: str = "us-east-1"
     s3_repositories_bucket: str = "meridian-repositories"
+
+    # Investigation evidence (M6, private MinIO bucket). Downloads are
+    # authorized per request and served as short-lived signed URLs only.
+    s3_evidence_bucket: str = "meridian-evidence"
+    evidence_download_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    evidence_max_artifact_mb: int = Field(default=50, ge=1, le=512)
+    evidence_max_files: int = Field(default=32, ge=1, le=256)
+
+    # Browser reproduction (M6). Trusted operator configuration: the API
+    # validates user steps against these same caps; payloads never widen
+    # them. Only the static-file start profile exists in M6.
+    repro_max_steps: int = Field(default=20, ge=1, le=100)
+    repro_step_text_max: int = Field(default=500, ge=1, le=5000)
+    repro_selector_max: int = Field(default=300, ge=1, le=2000)
+    repro_route_max: int = Field(default=500, ge=1, le=2000)
+
+    # Model provider (M7). Default "fake" means UNCONFIGURED: reasoning
+    # stages block honestly until an operator sets a real provider.
+    # Test doubles are injected directly, never via this setting.
+    model_provider: str = "fake"
+    model_api_base: str = ""
+    model_api_key: str = ""
+    model_name: str = ""
+    model_timeout_seconds: int = Field(default=60, ge=5, le=600)
+    model_max_attempts: int = Field(default=3, ge=1, le=10)
+
+    # Patches (M8): unified diffs only, validated before storage.
+    patch_max_diff_kb: int = Field(default=200, ge=1, le=2048)
+    patch_diff_inline_kb: int = Field(default=64, ge=1, le=1024)
 
     @property
     def upload_max_bytes(self) -> int:
@@ -105,6 +144,18 @@ class Settings(BaseSettings):
     @property
     def git_import_max_file_bytes(self) -> int:
         return self.git_import_max_file_mb * 1024 * 1024
+
+    @property
+    def evidence_max_artifact_bytes(self) -> int:
+        return self.evidence_max_artifact_mb * 1024 * 1024
+
+    @property
+    def patch_max_diff_bytes(self) -> int:
+        return self.patch_max_diff_kb * 1024
+
+    @property
+    def patch_diff_inline_bytes(self) -> int:
+        return self.patch_diff_inline_kb * 1024
 
     @field_validator("database_url")
     @classmethod

@@ -69,6 +69,8 @@ def _truncate(database_url: str) -> None:
             text(
                 "TRUNCATE job_stages, jobs, snapshot_files, repository_snapshots, projects, "
                 "local_credentials, sessions, workspace_members, "
+                "security_findings, security_assessments, sandbox_executions, "
+                "investigation_reports, investigations, audit_events, "
                 "workspaces, users RESTART IDENTITY CASCADE"
             )
         )

@@ -24,7 +24,12 @@ from app.config import get_settings
 from app.envelope import ApiError
 from app.models import RepositorySnapshot, SnapshotFile, User
 from app.services import projects as project_service
-from app.services.archive_security import ValidatedEntry, compute_tree_digest
+from app.services.archive_security import (
+    SKIP_DIRS,
+    ValidatedEntry,
+    compute_tree_digest,
+    is_secret_file,
+)
 from app.services.object_store import MinioObjectStore, ObjectStore, StorageError, sha256_file
 
 logger = logging.getLogger("meridian.storage")
@@ -208,6 +213,200 @@ def materialize_for_workspace(
     return _materialize_extracted(session, snapshot, tmp_path, dest_dir, workdir)
 
 
+def _mark_security_failed(
+    session: Session, snapshot: RepositorySnapshot, status: str, code: str, message: str
+) -> None:
+    snapshot.security_scan_status = status
+    snapshot.error_code = code
+    snapshot.error_message = message
+    session.commit()
+
+
+def download_security_object(
+    session: Session,
+    workspace_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    store: ObjectStore | None = None,
+) -> tuple[RepositorySnapshot, str, str]:
+    """Workspace-scoped security-artifact download for the trusted worker.
+
+    No member variant exists by design: the artifact carries secret
+    file contents, so only the preflight orchestrator may fetch it.
+    Digest verification and failure marking mirror member retrieval,
+    but mark the security status, never the main storage status.
+    """
+    snapshot = project_service.get_workspace_snapshot(session, workspace_id, snapshot_id)
+    if snapshot.security_scan_status != "ready" or not snapshot.security_storage_key:
+        raise ApiError(409, "SNAPSHOT_NOT_READY", "The security scan input is not stored.")
+    if not snapshot.security_content_digest or snapshot.security_storage_bytes is None:
+        raise ApiError(409, "SNAPSHOT_NOT_READY", "The security scan input record is incomplete.")
+    active_store = store or get_store()
+    bucket = get_settings().s3_repositories_bucket
+    workdir = tempfile.mkdtemp(prefix="meridian-retrieve-")
+    tmp_path = os.path.join(workdir, "security.tar")
+    try:
+        active_store.download_file(bucket, snapshot.security_storage_key, tmp_path)
+    except StorageError as exc:
+        shutil.rmtree(workdir, ignore_errors=True)
+        if exc.code == "OBJECT_NOT_FOUND":
+            _mark_security_failed(
+                session, snapshot, "integrity_failed",
+                "OBJECT_NOT_FOUND", "The stored security object is missing.",
+            )
+            raise ApiError(
+                409, "SNAPSHOT_NOT_READY", "The stored security object is missing."
+            ) from exc
+        raise ApiError(503, exc.code, exc.message) from exc
+    expected = _key_digest(snapshot.security_storage_key)
+    if expected != snapshot.security_content_digest:
+        shutil.rmtree(workdir, ignore_errors=True)
+        _mark_security_failed(
+            session, snapshot, "integrity_failed",
+            "DIGEST_MISMATCH", "The security key disagrees with the recorded digest.",
+        )
+        raise ApiError(
+            422, "INTEGRITY_FAILED", "The security key disagrees with the recorded digest."
+        )
+    actual = sha256_file(tmp_path)
+    if actual != expected or os.path.getsize(tmp_path) != snapshot.security_storage_bytes:
+        shutil.rmtree(workdir, ignore_errors=True)
+        _mark_security_failed(
+            session, snapshot, "integrity_failed",
+            "DIGEST_MISMATCH", "Stored security bytes differ from the recorded digest.",
+        )
+        raise ApiError(
+            422, "INTEGRITY_FAILED", "Stored security bytes differ from the recorded digest."
+        )
+    return snapshot, tmp_path, expected
+
+
+def materialize_security_input_for_workspace(
+    session: Session,
+    workspace_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    dest_dir: str,
+    store: ObjectStore | None = None,
+) -> dict:
+    """Materialize the verified security scan input for the worker (D62).
+
+    Indexed members must match the stored file rows exactly (hashes and
+    tree digest); every extra member must satisfy the pure archive
+    policy for secret files (secret basename, outside skipped dirs).
+    Secret contents are written to the caller's directory with the same
+    restrictive modes as member retrieval — the caller owns cleanup.
+    """
+    import tarfile
+
+    snapshot, tmp_path, _expected = download_security_object(
+        session, workspace_id, snapshot_id, store
+    )
+    workdir = os.path.dirname(tmp_path)
+    try:
+        if not os.path.isdir(dest_dir):
+            raise ApiError(422, "VALIDATION_ERROR", "The destination is not a directory.")
+        if os.listdir(dest_dir):
+            raise ApiError(422, "VALIDATION_ERROR", "The destination directory is not empty.")
+        settings = get_settings()
+        max_files = settings.max_archive_files
+        max_bytes = settings.extracted_max_bytes
+        rows = list(
+            session.execute(
+                select(SnapshotFile).where(SnapshotFile.snapshot_id == snapshot.id)
+            ).scalars()
+        )
+        expected_hashes = {row.path: row.sha256 for row in rows}
+        seen: dict[str, str] = {}
+        total = 0
+        try:
+            with tarfile.open(tmp_path, "r") as probe:
+                members = probe.getmembers()
+        except (tarfile.TarError, EOFError, OSError):
+            _mark_security_failed(
+                session, snapshot, "integrity_failed",
+                "TARBALL_CORRUPT", "The stored security object is not a valid archive.",
+            )
+            raise ApiError(
+                422, "INTEGRITY_FAILED", "The stored security object is not a valid archive."
+            ) from None
+        with tarfile.open(tmp_path, "r") as tar:
+            files = [member for member in members if not member.isdir()]
+            if len(files) > max_files:
+                raise ApiError(422, "INTEGRITY_FAILED", "The stored security archive is too large.")
+            for member in files:
+                if not member.isfile():
+                    raise ApiError(
+                        422, "INTEGRITY_FAILED", "The stored security archive has a special file."
+                    )
+                rel = _validate_member(member.name)
+                if rel in seen:
+                    raise ApiError(
+                        422, "INTEGRITY_FAILED", "The stored security archive has duplicate paths."
+                    )
+                if member.size > max_bytes or total + member.size > max_bytes:
+                    raise ApiError(
+                        422, "INTEGRITY_FAILED", "The stored security archive is too large."
+                    )
+                target = os.path.join(dest_dir, *rel.split("/"))
+                parent = os.path.dirname(target)
+                os.makedirs(parent, mode=0o700, exist_ok=True)
+                extracted = tar.extractfile(member)
+                if extracted is None:
+                    raise ApiError(
+                        422, "INTEGRITY_FAILED", "A stored security file cannot be read."
+                    )
+                digest = hashlib.sha256()
+                written = 0
+                with open(target, "wb") as out:
+                    while True:
+                        chunk = extracted.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        digest.update(chunk)
+                        out.write(chunk)
+                        written += len(chunk)
+                os.chmod(target, 0o600)
+                if written != member.size:
+                    raise ApiError(422, "INTEGRITY_FAILED", "A stored security file changed size.")
+                seen[rel] = digest.hexdigest()
+                total += written
+        indexed_paths = set(expected_hashes)
+        extra_paths = sorted(set(seen) - indexed_paths)
+        missing = sorted(indexed_paths - set(seen))
+        if missing:
+            raise ApiError(
+                422, "INTEGRITY_FAILED", f"Security file set mismatch: missing {len(missing)}."
+            )
+        for rel in extra_paths:
+            basename = rel.rsplit("/", 1)[-1]
+            under_skipped = any(part in SKIP_DIRS for part in rel.split("/")[:-1])
+            if under_skipped or not is_secret_file(basename):
+                raise ApiError(
+                    422, "INTEGRITY_FAILED",
+                    "The stored security archive has an unexpected entry.",
+                )
+        for rel in indexed_paths:
+            if seen[rel] != expected_hashes[rel]:
+                raise ApiError(422, "INTEGRITY_FAILED", f"Hash mismatch for file: {rel}")
+        authoritative = sorted(rows, key=lambda row: row.path)
+        recomputed = compute_tree_digest(
+            [
+                ValidatedEntry(path=row.path, size=row.size, sha256=row.sha256)
+                for row in authoritative
+            ]
+        )
+        if recomputed != snapshot.tree_digest:
+            raise ApiError(422, "INTEGRITY_FAILED", "Snapshot digest mismatch.")
+        return {
+            "snapshot_id": str(snapshot.id),
+            "files": len(seen),
+            "total_bytes": total,
+            "secret_files": len(extra_paths),
+            "tree_digest": snapshot.tree_digest,
+        }
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 def _materialize_extracted(
     session: Session,
     snapshot: RepositorySnapshot,
@@ -321,33 +520,55 @@ def _materialize_extracted(
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def delete_snapshot_content(session: Session, snapshot: RepositorySnapshot) -> None:
-    """Best-effort object removal honoring shared-key reference counts.
-
-    Deletes the object only when no other snapshot row references the
-    key. Never raises: failures are logged for the future janitor (D51)
-    so storage outages cannot block project deletion.
-    """
-    if not snapshot.storage_key:
-        return
+def _delete_key_if_unreferenced(
+    session: Session, snapshot_id: uuid.UUID, key: str, kind: str
+) -> None:
+    """Delete one object key when no other row references it. Never raises."""
     remaining = (
         session.execute(
             select(func.count())
             .select_from(RepositorySnapshot)
             .where(
-                RepositorySnapshot.storage_key == snapshot.storage_key,
-                RepositorySnapshot.id != snapshot.id,
+                (
+                    (RepositorySnapshot.storage_key == key)
+                    | (RepositorySnapshot.security_storage_key == key)
+                ),
+                RepositorySnapshot.id != snapshot_id,
             )
         )
     ).scalar_one()
     if remaining > 0:
-        logger.info("snapshot object shared snapshot_id=%s references=%d", snapshot.id, remaining)
+        logger.info(
+            "snapshot object shared snapshot_id=%s kind=%s references=%d",
+            snapshot_id,
+            kind,
+            remaining,
+        )
         return
     try:
-        get_store().delete_object(get_settings().s3_repositories_bucket, snapshot.storage_key)
-        logger.info("snapshot object deleted snapshot_id=%s", snapshot.id)
+        get_store().delete_object(get_settings().s3_repositories_bucket, key)
+        logger.info("snapshot object deleted snapshot_id=%s kind=%s", snapshot_id, kind)
     except StorageError as exc:
-        logger.warning("snapshot object orphaned snapshot_id=%s code=%s", snapshot.id, exc.code)
+        logger.warning(
+            "snapshot object orphaned snapshot_id=%s kind=%s code=%s",
+            snapshot_id,
+            kind,
+            exc.code,
+        )
+
+
+def delete_snapshot_content(session: Session, snapshot: RepositorySnapshot) -> None:
+    """Best-effort object removal honoring shared-key reference counts.
+
+    Deletes each artifact only when no other snapshot row references
+    its key (either column counts: the security fields may mirror the
+    main object). Never raises: failures are logged for the future
+    janitor (D51) so storage outages cannot block project deletion.
+    """
+    if snapshot.storage_key:
+        _delete_key_if_unreferenced(session, snapshot.id, snapshot.storage_key, "snapshot")
+    if snapshot.security_storage_key and snapshot.security_storage_key != snapshot.storage_key:
+        _delete_key_if_unreferenced(session, snapshot.id, snapshot.security_storage_key, "security")
 
 
 def list_orphan_keys(session: Session, store: ObjectStore | None = None) -> dict:
@@ -370,6 +591,13 @@ def list_orphan_keys(session: Session, store: ObjectStore | None = None) -> dict
         for row in session.execute(
             select(RepositorySnapshot.storage_key).where(
                 RepositorySnapshot.storage_key.is_not(None)
+            )
+        ).all()
+    } | {
+        row[0]
+        for row in session.execute(
+            select(RepositorySnapshot.security_storage_key).where(
+                RepositorySnapshot.security_storage_key.is_not(None)
             )
         ).all()
     }

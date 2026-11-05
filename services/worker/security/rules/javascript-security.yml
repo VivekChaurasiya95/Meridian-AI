@@ -1,0 +1,32 @@
+# Meridian preflight ruleset (preflight-v1): JavaScript.
+# Pattern-only rules (no taint mode): deterministic, fast, offline.
+rules:
+  - id: meridian-js-eval
+    languages: [javascript]
+    severity: ERROR
+    message: Dynamic code execution with eval() can run attacker-controlled code.
+    metadata:
+      category: code-execution
+      confidence: HIGH
+    patterns:
+      - pattern: eval(...)
+
+  - id: meridian-js-innerhtml
+    languages: [javascript]
+    severity: WARNING
+    message: Assigning innerHTML with untrusted data may allow cross-site scripting.
+    metadata:
+      category: xss
+      confidence: MEDIUM
+    patterns:
+      - pattern: $EL.innerHTML = ...
+
+  - id: meridian-js-exec-concat
+    languages: [javascript]
+    severity: ERROR
+    message: Shell command built with string concatenation may allow command injection.
+    metadata:
+      category: injection
+      confidence: MEDIUM
+    patterns:
+      - pattern: $CP.exec($A + $B, ...)

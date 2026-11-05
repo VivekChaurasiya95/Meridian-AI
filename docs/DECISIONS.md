@@ -355,3 +355,205 @@ contracts > Database spec > Design system > Implementation plan > existing code.
   MinIO, read-back verify) — identical trees dedup across ZIP and Git.
   Per-file cap 25 MiB (operator config). No tokens, no private repos,
   no arbitrary Git servers in this phase.
+
+## Security Preflight V1 decisions (security.md, backend + read APIs)
+
+- **D61 — Migration 008 (doc said 007, occupied by git import).**
+  Additive migration: widens `ck_jobs_type` with `security_preflight`,
+  adds the four security-artifact columns to `repository_snapshots`,
+  creates `security_assessments` + `security_findings`, and extends
+  `sandbox_executions` with a `scanner` discriminator (`''` for smoke,
+  one of the scanner names otherwise) so two scanner containers in one
+  job attempt keep distinct rows while `is_execution_live` semantics
+  (attempt equality) stay untouched. Smoke duplicate protection is
+  preserved by the widened unique key.
+- **D62 — Security scan input: second content-addressed tarball.**
+  Ingestion packs `indexed + secret files` (skip-dirs still excluded)
+  into `security/<digest>.tar` in the same private bucket, verified by
+  read-back before the snapshot is ready. No manifest change: secret
+  file names stay out of API responses. Materialization verifies the
+  object digest plus structure, and requires every non-indexed member
+  to satisfy the existing `is_secret_file` + skip-dir policy — the
+  pure archive policy, not a stored list, is the baseline.
+- **D63 — Pinned scanners, stdout-JSON contracts, exit semantics.**
+  `semgrep/semgrep:1.183.0` runs `semgrep scan --config <rules> --json`
+  (exit 0 = completed regardless of findings, per upstream docs);
+  `zricethezav/gitleaks:v8.30.1` runs `gitleaks dir /work --report-format
+  json --report-path - --redact` (`-` = stdout per upstream source,
+  exit 0 = clean, exit 1 = leaks found). Any truncated, missing, or
+  unparseable output is a scan failure, never a clean report.
+  Meridian-owned semgrep rules ship in the worker image and enter the
+  container under a reserved root directory; repository configs,
+  ignore files excepted, are never honored (standard scanner semantics
+  for `nosemgrep`/`gitleaks:allow`/ignore files are accepted and
+  documented: preflight is advisory-only, see D67).
+- **D64 — Scanner profiles reuse the sandbox, parameterized by trust.**
+  `pack_build_context` accepts the base image and reserved extra files
+  from the profile (validated pin format, never `:latest`, never from
+  payloads); the Dockerfile stays RUN-free with `COPY --chown=65534`.
+  Container controls are identical to smoke (non-root, read-only
+  rootfs, no-new-privileges, `network_mode=none`, caps dropped, PID
+  128, 0.5 CPU, 512m). Scanner stdout/stderr are NEVER persisted to
+  execution rows (they carry secret values); only counts, versions,
+  and fixed codes are recorded.
+- **D65 — Preflight trigger: ZIP uploads only in V1.**
+  `upload_source` enqueues `security_preflight` after the snapshot is
+  ready (git-import snapshots follow later). Idempotency key
+  `preflight:{snapshot}:{profile}:{policy}` prevents duplicate active
+  jobs across retries and duplicate uploads. Enqueue failure fails the
+  upload loudly (no silent unscanned snapshots); an outbox pattern is
+  deferred to hardening.
+- **D66 — Assessment identity: one row per job, findings per row.**
+  `security_assessments` is UNIQUE on `job_id` (retries reuse the row,
+  findings replaced); `generation` counts assessments per snapshot for
+  future rescans. Findings carry a stable fingerprint
+  (scanner|rule|path|lines, never secret values) unique per
+  assessment; persistence caps at 5000 findings (severity-ordered,
+  dropped counts recorded honestly). `jobs.result` references the
+  assessment; raw scanner output never leaves the worker.
+- **D67 — Preflight never gates execution.**
+  No backend path consults an assessment before running a sandbox
+  container: a clean or missing report cannot weaken isolation. The UI
+  (deferred) must render `no findings` as "no issues detected by
+  configured checks", never "safe".
+
+## Investigation reports + Meta Muse wiring (M9)
+
+- **D68 — Reports ride verification finalization, best-effort.**
+  `report_v1` (title/summary/1-8 prose sections, no invented
+  citations) persists to `investigation_reports` (migration 013) via
+  a model call inside `_post_verify` immediately before finalize —
+  not a new FLOW stage, so flow, retry, and constraint surfaces are
+  untouched. A missing provider skips silently; any other report
+  failure is logged, recorded on the stage output, and never
+  overrides the deterministic verification verdict (lease/cancel
+  still propagate). Latest report per investigation is served at
+  `GET /api/v1/investigations/{id}/report`.
+- **D69 — Meta Muse via the existing provider gateway, no new code.**
+  `HttpModelProvider` already speaks the Meta Model API contract
+  (verified against Meta's own docs): `POST {base}/chat/completions`
+  with Bearer auth, `choices/message/content` + `usage` tokens.
+  Wiring is configuration only: `model_api_base` =
+  `https://api.meta.ai/v1`, `model_name` = `muse-spark-1.3`
+  (Meta's recommended example), key in gitignored `.env` as
+  `model_api_key` (set by the operator, never printed, never in
+  argv). One open item: `response_format: json_object` is
+  unconfirmed in Meta's docs (they push `json_schema`); a minimal
+  live probe settles it, and a `json_schema` upgrade follows only
+  if the probe rejects it.
+
+## Milestone 3–5 completion hardening
+
+- **D68 — Execution rows are member-readable (M5 observability).**
+  `GET /api/v1/jobs/{job_id}/executions` and
+  `GET /api/v1/executions/{execution_id}` serve persisted sandbox runs
+  to workspace members (unknown/foreign ids answer 404). Responses
+  carry redacted tail excerpts plus character counts, never unbounded
+  output; full-output download stays a later milestone.
+- **D69 — Job JSON bounds (M4 hardening).**
+  Payloads ≤ 32 KiB, results ≤ 64 KiB, stage summaries ≤ 16 KiB, plus a
+  200-key / 10-deep cap (`check_json_bounds`, 422 past them). Queue rows
+  are read on every poll, so one unbounded object must not DoS readers.
+- **D70 — Secret redaction at the persistence boundary (M5).**
+  `app.services.redact` classifies by meaning (credential-word
+  assignments in any naming style, bearer tokens, URL passwords, PEM
+  blocks, provider token shapes) and runs in `finish_execution` and on
+  job-result excerpts, so leaked credentials cannot accumulate in rows,
+  results, or API responses.
+- **D71 — Ingestion stages carry timestamps and details (M3).**
+  The synchronous upload response annotates every completed stage with
+  one honest shared `finished_at` (no fabricated stagger) and a safe
+  detail line (counts/bytes only, never storage keys) toward PROJ-02.
+- **D72 — Test service sessions use the migrated test DB.**
+  `db_session` fixtures in the job/sandbox suites now build on
+  `migrated_db` instead of `DATABASE_URL`, so service-layer calls see
+  API-created rows wherever the two URLs differ (as in CI).
+
+## Milestone 6 — investigations, browser reproduction, evidence
+
+- **D73 — M6 covers the first three stages only.**
+  The pipeline runs project_inspection → reproduction →
+  evidence_analysis; hypotheses, regression tests, patches,
+  verification, and reports stay M7+. Unbuilt stages record no rows
+  and retry only within the M6 three.
+- **D74 — Scripted assertions describe the buggy behavior.**
+  All assertions passing means the bug reproduced; any failing means
+  it did not; none means inconclusive. "Not reproduced" is a terminal
+  completed outcome whose summary states it does not establish that
+  the bug is absent.
+- **D75 — Chromium runs unsandboxed inside a sandboxed container.**
+  The repro script launches Chromium with `--no-sandbox` (the
+  setuid sandbox is incompatible with non-root plus no-new-privs);
+  the container boundary — non-root, read-only rootfs, no network,
+  dropped capabilities, fixed argv — remains the isolation layer.
+- **D76 — Retryable stage failures defer finalization.**
+  While job attempts remain, a retryable failure records the failed
+  attempt and re-raises without finalizing, so the next claim can
+  re-run; only the exhausted attempt or a terminal verdict (blocked,
+  non-retryable failure) finalizes the investigation.
+- **D77 — Cancel finalizes when no worker can ack.**
+  If the linked job is not running, cancel finalizes the
+  investigation immediately instead of stranding it behind a flag;
+  a running job keeps actual state until the worker confirms.
+- **D78 — Attachments rejected, snapshot required.**
+  Report attachments fail closed with ATTACHMENTS_NOT_SUPPORTED
+  (no upload sessions exist to back them); a ready same-project
+  snapshot is mandatory at create so every run pins its bytes.
+- **D79 — Evidence URLs are audited, redaction gates downloads.**
+  Every signed-URL issuance writes an audit row without the URL;
+  artifacts stuck in redaction `failed` refuse issuance with 409.
+  Storage keys and MIME sniffing stay server-side; MIME is
+  detected from magic bytes, never caller claims.
+- **D80 — Worker holds evidence read/write in compose.**
+  The minio-init policy grants the worker service account scoped
+  read/write on the private evidence bucket (repos stay read-only).
+  Evidence bytes are never served by the API — signed URLs only.
+
+## Milestone 7 — evidence-grounded hypotheses
+
+- **D81 — An unconfigured provider blocks honestly.**
+  The default `model_provider=fake` is UNCONFIGURED by definition:
+  reasoning stages fail with MODEL_NOT_CONFIGURED (blocked, never
+  retried into fake output) until the operator supplies a live
+  key and model. Doubles exist only for tests and recorded fixtures.
+- **D82 — Hypotheses cite evidence; invalid output resamples once.**
+  Every hypothesis carries supports/contradicts/context links to
+  persisted evidence ids (unknown ids rejected). A schema-invalid
+  model sample gets exactly one resample, then fails the stage;
+  token counts and latency land on the model tool run for audit.
+
+## Milestone 8 — regression tests, patches, verification
+
+- **D83 — Plain unified diffs only, applied with zero fuzz.**
+  Proposals accept `---`/`+++`/`@@` structure only — no git
+  extensions, renames, modes, or binaries — with repo-relative
+  paths under traversal guards. The stored bytes are immutable;
+  application re-verifies the sha256 binding before touching a tree.
+- **D84 — Approval binds the exact reviewed digest and snapshot.**
+  Approve posts back the digest plus base snapshot id; a mismatch
+  refuses with 422. The transition is row-locked, restricted to
+  owner/admin, and audited with the digest it covered. Reject needs
+  a reason; discard is blocked while a job or approval is live.
+- **D85 — The approval gate parks; decisions enqueue the next leg.**
+  `awaiting_user_approval` completes its stage and job while the
+  investigation waits (non-terminal). Approval requeues from
+  patch_application; rejection completes with "No changes applied";
+  cancel with no live job finalizes immediately (D77).
+- **D86 — Only reproducing tests gate the patch.**
+  Baseline verdict `failed` means the test reproduces the bug (the
+  expected outcome). Post-patch runs only baseline-failed tests; a
+  run with no executed check can never read `passed`; a failing
+  gate fails the investigation so a retry proposes a fresh patch.
+- **D87 — Executions are keyed per run within a job attempt.**
+  `run_key` extends the execution unique key to (job, attempt,
+  scanner, run_key) so one job can run repro plus N verification
+  containers (migration 012). The scanner CHECK is untouched, so
+  preflight semantics do not change; single-run callers keep ''.
+- **D88 — Inconclusive verification claims neither pass nor fail.**
+  When gated checks come back inconclusive (or all skipped), the
+  patch stays `applied` and the investigation finalizes
+  `inconclusive` with an explicit summary — never a quiet pass.
+- **D89 — Future-milestone UI degrades by endpoint, not by version.**
+  The comparison/rerun (M9) and reports (M10) panels probe their
+  endpoints: a 404 hides the panel instead of erroring, so the
+  investigation page stays truthful on every backend milestone.

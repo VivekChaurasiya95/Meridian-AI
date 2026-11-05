@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Job, SandboxExecution
+from app.services.redact import redact_text
 from sandbox.container_runtime import destroy_container
 from sandbox.exceptions import SandboxError
 
@@ -41,14 +42,23 @@ def create_execution(
     snapshot_id: uuid.UUID | None,
     profile: str,
     attempt: int,
+    scanner: str = "",
+    run_key: str = "",
 ) -> SandboxExecution:
-    """Insert the running row. A duplicate (job, attempt) is a hard error."""
+    """Insert the running row.
+
+    A duplicate (job, attempt, scanner, run_key) is a hard error.
+    Single-run callers keep run_key ''; multi-run flows (M8
+    verification) pass one stable key per run.
+    """
     row = SandboxExecution(
         id=execution_id,
         job_id=job_id,
         worker_id=worker_id,
         snapshot_id=snapshot_id,
         profile=profile,
+        scanner=scanner,
+        run_key=run_key,
         status="running",
         attempt=attempt,
         created_at=_now(session),
@@ -58,10 +68,12 @@ def create_execution(
         session.commit()
     except IntegrityError as exc:
         session.rollback()
-        # Narrow the mapping: only the (job, attempt) unique violation
-        # means a duplicate execution. Anything else (a broken FK, a bad
-        # CHECK) is an internal data bug, and misreporting it as a
-        # duplicate would send debugging down the wrong path entirely.
+        # Narrow the mapping: only the (job, attempt, scanner, run_key)
+        # unique violation means a duplicate execution. Anything else (a
+        # broken FK, a bad CHECK) is an internal data bug, and
+        # misreporting it as a duplicate would send debugging down the
+        # wrong path entirely. The 012 name keeps the 006 prefix so this
+        # mapping survives the migration either way.
         if "uq_sandbox_exec_job_attempt" in str(getattr(exc, "orig", exc)):
             raise SandboxError(
                 "DUPLICATE_EXECUTION",
@@ -92,7 +104,11 @@ def finish_execution(
     error_code: str | None = None,
     error_message: str | None = None,
 ) -> SandboxExecution:
-    """Mark an execution terminal. Missing rows are a caller bug: loud."""
+    """Mark an execution terminal. Missing rows are a caller bug: loud.
+
+    Untrusted text (container output, error detail) is secret-redacted
+    before persistence so leaked credentials cannot accumulate in rows.
+    """
     row = session.get(SandboxExecution, execution_id)
     if row is None:
         raise SandboxError("EXECUTION_NOT_FOUND", "The execution row is missing.")
@@ -100,11 +116,11 @@ def finish_execution(
     row.exit_code = exit_code
     row.timed_out = timed_out
     row.duration_ms = duration_ms
-    row.stdout = stdout
-    row.stderr = stderr
+    row.stdout = redact_text(stdout)
+    row.stderr = redact_text(stderr)
     row.output_truncated = output_truncated
     row.error_code = error_code
-    row.error_message = error_message
+    row.error_message = redact_text(error_message)
     row.completed_at = _now(session)
     session.commit()
     return row

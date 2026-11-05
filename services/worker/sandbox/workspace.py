@@ -21,6 +21,7 @@ import tempfile
 from typing import TYPE_CHECKING, Any
 
 from .exceptions import SandboxError
+from .execution_policy import validate_image_ref
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -44,21 +45,58 @@ SOURCE_MAX_BYTES = 256 * 1024 * 1024
 BUILD_DOCKERFILE_NAME = "Meridian.Dockerfile"
 
 # Context-root names that control the image build and therefore can
-# never come from snapshot data: the reserved build file itself, and
-# ".dockerignore", which the builder would otherwise honor when
-# selecting files for COPY. Anything else — including a root-level
-# "Dockerfile" — is packed as data. Only exact root matches are
-# reserved; the same names nested in subdirectories are inert data.
-RESERVED_ROOT_NAMES = frozenset({BUILD_DOCKERFILE_NAME, ".dockerignore"})
+# never come from snapshot data: the reserved build file itself,
+# ".dockerignore" (which the builder would otherwise honor when
+# selecting files for COPY), and the trusted rules directory (which
+# would collide with Meridian-owned scanner configuration). Anything
+# else — including a root-level "Dockerfile" — is packed as data.
+# Exact root matches are reserved, as is anything under the rules
+# directory; the same names nested elsewhere are inert data.
+RULES_ROOT = "Meridian.rules"
+RESERVED_ROOT_NAMES = frozenset({BUILD_DOCKERFILE_NAME, ".dockerignore", RULES_ROOT})
 
-# Fixed build-context Dockerfile: pinned base, source owned by the
-# non-root execution user, no RUN steps (nothing executes at build time).
-BUILD_DOCKERFILE = """\
-FROM python:3.12-slim
+# Trusted base images may only come from sandbox profiles (validated
+# pin format); payloads never select them. This default serves smoke.
+DEFAULT_BASE_IMAGE = "python:3.12-slim"
+
+# Fixed build-context Dockerfile template: pinned base, source owned
+# by the non-root execution user, no RUN steps (nothing executes at
+# build time). Only the FROM line is ever parameterized, and only with
+# a validated profile image.
+BUILD_DOCKERFILE_TEMPLATE = """\
+FROM {base}
 COPY --chown=65534:65534 . /work
 USER 65534:65534
 WORKDIR /work
 """
+BUILD_DOCKERFILE = BUILD_DOCKERFILE_TEMPLATE.format(base=DEFAULT_BASE_IMAGE)
+
+# Trusted extra files (Meridian-owned scanner rules) are small and few.
+MAX_EXTRA_FILES = 16
+MAX_EXTRA_FILE_BYTES = 1024 * 1024
+
+
+def _dockerfile_for(base_image: str) -> bytes:
+    return BUILD_DOCKERFILE_TEMPLATE.format(base=validate_image_ref(base_image)).encode("utf-8")
+
+
+def _check_extra_name(name: str) -> str:
+    """Extra files live under the rules root with safe basenames only."""
+    if not name.startswith(RULES_ROOT + "/"):
+        raise SandboxError(
+            "RESERVED_FILENAME", f"Extra files must live under {RULES_ROOT}/."
+        )
+    rest = name[len(RULES_ROOT) + 1 :]
+    if (
+        not rest
+        or "/" in rest
+        or "\\" in rest
+        or "\x00" in rest
+        or rest in (".", "..")
+        or len(rest) > 128
+    ):
+        raise SandboxError("RESERVED_FILENAME", "Extra file names must be safe basenames.")
+    return name
 
 
 def create_workspace() -> str:
@@ -100,7 +138,11 @@ def prepare_source(
 
 
 def pack_build_context(
-    workspace_dir: str, max_bytes: int = SOURCE_MAX_BYTES
+    workspace_dir: str,
+    max_bytes: int = SOURCE_MAX_BYTES,
+    *,
+    base_image: str | None = None,
+    extra_root_files: dict[str, bytes] | None = None,
 ) -> tuple[bytes, str]:
     """Pack a materialized tree into a deterministic build-context tarball.
 
@@ -108,7 +150,22 @@ def pack_build_context(
     with normalized ownership and modes; the fixed Dockerfile is added at
     the context root. Deterministic output means identical snapshots yield
     identical tags, so the daemon layer cache is actually useful.
+
+    ``base_image`` overrides the FROM line with a validated profile
+    image (scanner builds; None or "" keeps the smoke default);
+    ``extra_root_files`` adds trusted
+    Meridian-owned files (scanner rules) under the reserved rules
+    directory. Both are trusted-caller-only: payloads never supply
+    them, and snapshot data can never collide with them.
     """
+    dockerfile_bytes = _dockerfile_for(base_image or DEFAULT_BASE_IMAGE)
+    extras = dict(extra_root_files or {})
+    if len(extras) > MAX_EXTRA_FILES:
+        raise SandboxError("WORKSPACE_TOO_LARGE", "Too many trusted extra files.")
+    for name, data in extras.items():
+        _check_extra_name(name)
+        if not isinstance(data, bytes) or not data or len(data) > MAX_EXTRA_FILE_BYTES:
+            raise SandboxError("INVALID_EXTRAS", "Trusted extra files must be bounded bytes.")
     entries: list[tuple[str, str, int]] = []
     total = 0
     for root, dirs, files in os.walk(workspace_dir):
@@ -120,7 +177,7 @@ def pack_build_context(
                     "UNPACKABLE_FILE", f"Not a regular file: {name}."
                 )
             rel = os.path.relpath(full, workspace_dir).replace(os.sep, "/")
-            if rel in RESERVED_ROOT_NAMES:
+            if rel in RESERVED_ROOT_NAMES or rel.startswith(RULES_ROOT + "/"):
                 raise SandboxError(
                     "RESERVED_FILENAME",
                     f"Snapshot files must not use the reserved name: {rel}.",
@@ -132,8 +189,8 @@ def pack_build_context(
                     "WORKSPACE_TOO_LARGE", "Packed source exceeds the workspace limit."
                 )
             entries.append((rel, full, size))
-    dockerfile_bytes = BUILD_DOCKERFILE.encode("utf-8")
-    if total + len(dockerfile_bytes) > max_bytes:
+    extras_bytes = sum(len(data) for data in extras.values())
+    if total + len(dockerfile_bytes) + extras_bytes > max_bytes:
         raise SandboxError(
             "WORKSPACE_TOO_LARGE", "Packed source exceeds the workspace limit."
         )
@@ -148,6 +205,27 @@ def pack_build_context(
         info.gname = ""
         info.mode = 0o644
         tar.addfile(info, io.BytesIO(dockerfile_bytes))
+        if extras:
+            dir_info = tarfile.TarInfo(name=RULES_ROOT)
+            dir_info.type = tarfile.DIRTYPE
+            dir_info.mtime = 0
+            dir_info.uid = 0
+            dir_info.gid = 0
+            dir_info.uname = ""
+            dir_info.gname = ""
+            dir_info.mode = 0o755
+            tar.addfile(dir_info)
+            for name in sorted(extras):
+                data = extras[name]
+                file_info = tarfile.TarInfo(name=name)
+                file_info.size = len(data)
+                file_info.mtime = 0
+                file_info.uid = 0
+                file_info.gid = 0
+                file_info.uname = ""
+                file_info.gname = ""
+                file_info.mode = 0o644
+                tar.addfile(file_info, io.BytesIO(data))
         for rel, full, size in entries:
             info = tarfile.TarInfo(name=rel)
             info.size = size

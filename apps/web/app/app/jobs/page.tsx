@@ -9,11 +9,12 @@ import {
   cancelJob,
   formatTimestamp,
   getJobStages,
+  listJobExecutions,
   listJobs,
   listWorkspaces,
   submitJob,
 } from "@/lib/api";
-import type { Job, JobStage, JobStatus, Workspace } from "@/lib/types";
+import type { Job, JobStage, JobStatus, SandboxExecution, Workspace } from "@/lib/types";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -51,9 +52,12 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: (job: Job) => void })
   const [open, setOpen] = React.useState(false);
   const [stages, setStages] = React.useState<JobStage[] | null>(null);
   const [stagesError, setStagesError] = React.useState<string | null>(null);
+  const [executions, setExecutions] = React.useState<SandboxExecution[] | null>(null);
+  const [executionsError, setExecutionsError] = React.useState<string | null>(null);
   const [working, setWorking] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const live = job.status === "queued" || job.status === "running" || job.status === "retry_wait";
+  const isSandboxJob = job.job_type === "sandbox_smoke";
 
   async function toggle() {
     const next = !open;
@@ -63,6 +67,13 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: (job: Job) => void })
         setStages(await getJobStages(job.id));
       } catch (err) {
         setStagesError(err instanceof Error ? err.message : "Could not load stages.");
+      }
+    }
+    if (next && isSandboxJob && executions === null) {
+      try {
+        setExecutions(await listJobExecutions(job.id));
+      } catch (err) {
+        setExecutionsError(err instanceof Error ? err.message : "Could not load executions.");
       }
     }
   }
@@ -184,6 +195,70 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: (job: Job) => void })
                   </li>
                 ))}
               </ol>
+            )}
+            {isSandboxJob && (
+              <div className="mt-4 border-t border-line/60 pt-3">
+                <span className="font-mono text-[11px] tracking-[0.12em] text-ink-3 uppercase">
+                  Execution
+                </span>
+                {executionsError && (
+                  <p className="mt-2 text-[13px] text-danger">{executionsError}</p>
+                )}
+                {executions === null && !executionsError && (
+                  <div className="mt-2" aria-label="Loading execution">
+                    <Skeleton className="h-8" />
+                  </div>
+                )}
+                {executions !== null && executions.length === 0 && (
+                  <p className="mt-2 text-[13px] text-ink-3">
+                    No execution recorded yet — the row appears when a container starts.
+                  </p>
+                )}
+                {executions !== null &&
+                  executions.map((execution) => (
+                    <div key={execution.id} className="mt-2 flex flex-col gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          tone={
+                            execution.status === "completed"
+                              ? "success"
+                              : execution.status === "failed" || execution.status === "timed_out"
+                                ? "danger"
+                                : execution.status === "running"
+                                  ? "info"
+                                  : "neutral"
+                          }
+                          dot={false}
+                        >
+                          {execution.status.replace("_", " ")}
+                        </Badge>
+                        <span className="font-mono text-xs text-ink-3">
+                          exit {execution.exit_code ?? "—"}
+                          {execution.duration_ms !== null && ` · ${execution.duration_ms} ms`}
+                          {` · cleanup ${execution.cleanup_status}`}
+                          {execution.attempt > 1 && ` · attempt ${execution.attempt}`}
+                          {execution.run_key !== "" && ` · ${execution.run_key}`}
+                        </span>
+                      </div>
+                      {execution.error_message && (
+                        <p className="truncate text-[13px] text-danger" title={execution.error_message}>
+                          {execution.error_code}: {execution.error_message}
+                        </p>
+                      )}
+                      {execution.stdout_excerpt && (
+                        <pre className="overflow-x-auto rounded-lg border border-line/60 bg-surface-2/60 p-2.5 font-mono text-xs text-ink-2">
+                          {execution.stdout_excerpt}
+                        </pre>
+                      )}
+                      {execution.output_truncated && (
+                        <p className="text-xs text-ink-3">
+                          Output excerpt — {execution.stdout_chars + execution.stderr_chars} chars
+                          recorded.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+              </div>
             )}
           </div>
         )}

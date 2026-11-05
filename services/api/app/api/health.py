@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import check_database, get_engine
+from app.services.model_gateway import get_configured_provider
 from app.services.object_store import MinioObjectStore
 
 router = APIRouter(tags=["system"])
@@ -61,6 +62,20 @@ def check_object_storage() -> str:
         return "unavailable"
 
 
+def check_model_provider() -> str:
+    """Reasoning backend: ok / not_configured / unavailable.
+
+    Never raises and never leaks keys, endpoints, or model names.
+    ``not_configured`` (the default ``fake`` provider) means reasoning
+    stages block honestly until an operator configures a real backend.
+    """
+    try:
+        config = get_configured_provider()
+    except Exception:
+        return "unavailable"
+    return "ok" if config.configured else "not_configured"
+
+
 @router.get("/health/ready")
 def ready() -> JSONResponse:
     """Readiness for required dependencies. Response stays sanitized."""
@@ -71,6 +86,9 @@ def ready() -> JSONResponse:
         "queue": check_job_queue() if database_ok else "unavailable",
         # M5.1 persists snapshot content to the private repositories bucket.
         "object_storage": check_object_storage() if database_ok else "unavailable",
+        # M7 reasoning backend. Informational only: an unconfigured
+        # provider never blocks readiness; stages park honestly instead.
+        "model": check_model_provider() if database_ok else "unavailable",
     }
     if not database_ok:
         return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})

@@ -12,12 +12,20 @@ import datetime as dt
 import uuid
 from typing import overload
 
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, delete, desc, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.envelope import ApiError, access_denied, not_found
-from app.models import Project, RepositorySnapshot, SnapshotFile, User, WorkspaceMember
+from app.models import (
+    Job,
+    Project,
+    RepositorySnapshot,
+    SecurityAssessment,
+    SnapshotFile,
+    User,
+    WorkspaceMember,
+)
 from app.schemas import ProjectCreate, ProjectUpdate
 
 CONTRIBUTOR_ROLES = frozenset({"owner", "admin", "developer"})
@@ -406,10 +414,30 @@ def unarchive_project(session: Session, user: User, project_id: uuid.UUID) -> di
 
 def delete_project(session: Session, user: User, project_id: uuid.UUID) -> None:
     """Owner-only hard delete: snapshots and file rows go first in one
-    transaction (FK RESTRICT), then the project row itself."""
+    transaction (FK RESTRICT), then the project row itself. Projects
+    with investigations cannot be deleted: their history outlives source
+    cleanup and must stay queryable."""
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.models import Investigation
+
     project, role = _get_project(session, user, project_id)
     if role != "owner":
         raise access_denied()
+    # The investigations table only exists on DBs migrated to 009; a DB
+    # on an older revision cannot hold investigations, so there is
+    # nothing to guard. Never let a missing table turn delete into a 500.
+    bind = session.bind
+    if bind is not None and sa_inspect(bind).has_table("investigations"):
+        linked = (
+            session.execute(select(func.count()).where(Investigation.project_id == project.id))
+        ).scalar_one()
+        if linked:
+            raise ApiError(409, "INVALID_STATE", "Projects with investigations cannot be deleted.")
+    # Jobs keep workspace history but must not pin the project row
+    # (jobs.project_id is RESTRICT): detach them before deleting.
+    session.execute(update(Job).where(Job.project_id == project.id).values(project_id=None))
+    session.flush()
     snapshots = list(
         session.execute(
             select(RepositorySnapshot).where(RepositorySnapshot.project_id == project.id)
@@ -422,8 +450,22 @@ def delete_project(session: Session, user: User, project_id: uuid.UUID) -> None:
         snapshot.storage_status = "deleting"
         storage_service.delete_snapshot_content(session, snapshot)
         session.delete(snapshot)
+    session.flush()
+    # Safety net: assessments cascade off snapshots, but a row without a
+    # snapshot must never turn this delete into a 500. The table only
+    # exists on DBs migrated for preflight; skip when it is absent.
+    if bind is not None and sa_inspect(bind).has_table("security_assessments"):
+        session.execute(
+            delete(SecurityAssessment).where(SecurityAssessment.project_id == project.id)
+        )
     session.delete(project)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ApiError(
+            409, "INVALID_STATE", "This project cannot be deleted while linked records exist."
+        ) from exc
 
 
 def get_project_record(session: Session, user: User, project_id: uuid.UUID) -> tuple[Project, str]:

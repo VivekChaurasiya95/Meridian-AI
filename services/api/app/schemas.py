@@ -104,7 +104,13 @@ class JobSubmit(StrictModel):
     # fields its own job type needs. Result/worker internals are never
     # accepted here.
     job_type: Literal[
-        "lifecycle_test", "manifest_recheck", "sandbox_smoke", "git_preview", "git_import"
+        "lifecycle_test",
+        "manifest_recheck",
+        "sandbox_smoke",
+        "git_preview",
+        "git_import",
+        "security_preflight",
+        "investigation",
     ]
     payload: dict = Field(default_factory=dict)
     idempotency_key: str | None = Field(
@@ -112,3 +118,65 @@ class JobSubmit(StrictModel):
     )
     priority: int = Field(default=0, ge=0, le=1000)
     max_attempts: int | None = Field(default=None, ge=1, le=25)
+
+
+Severity = Literal["low", "medium", "high", "critical", "unspecified"]
+
+
+class InvestigationCreate(StrictModel):
+    # reproduction_context stays a caller-supplied object: the pure
+    # repro_spec validator (shared with the worker) checks route,
+    # browser, viewport, and steps against operator caps.
+    title: str = Field(min_length=1, max_length=200)
+    bug_report: str = Field(min_length=1, max_length=20000)
+    severity: Severity = "unspecified"
+    repository_snapshot_id: str = Field(min_length=1, max_length=64)
+    attachments: list[dict] = Field(default_factory=list)
+    reproduction_context: dict = Field(default_factory=dict)
+
+
+class InvestigationRetry(StrictModel):
+    from_stage: str = Field(min_length=1, max_length=64)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class RegressionTestCreate(StrictModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    test_type: Literal["unit", "integration", "e2e", "regression", "manual"] = "e2e"
+    file_path: str | None = Field(default=None, max_length=500)
+    test_name: str | None = Field(default=None, min_length=1, max_length=300)
+
+
+class HypothesisReviewUpdate(StrictModel):
+    # A user verdict on one hypothesis. Appended to the review history;
+    # the newest review is the effective one (M7-FINISH).
+    verdict: Literal["useful", "rejected", "needs_evidence"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class PatchApprove(StrictModel):
+    diff_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    base_snapshot_id: str = Field(min_length=1, max_length=64)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class PatchReject(StrictModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class ReportCreate(StrictModel):
+    # The only user input is the output format. Content always covers
+    # the full persisted investigation state (summary, snapshot,
+    # evidence, hypotheses, patches, verification) — no subset, no
+    # model-written IDs, so generation is deterministic per state (M10).
+    format: Literal["md", "html"]
+
+
+class VerificationRunCreate(StrictModel):
+    # Optional subset of regression-test ids to execute. Omitted or empty
+    # means every runnable test of the investigation. Items are validated
+    # as investigation-owned runnable tests in the service layer. Status
+    # is never accepted here: user-created runs always start queued and
+    # only the worker moves them (M9).
+    selected_check_keys: list[str] | None = Field(default=None, max_length=100)

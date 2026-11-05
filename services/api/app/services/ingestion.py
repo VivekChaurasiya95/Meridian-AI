@@ -14,6 +14,7 @@ small text previews, and a content-addressed object in MinIO — the
 immutable source context investigations need.
 """
 
+import datetime as dt
 import io
 import logging
 import shutil
@@ -27,6 +28,7 @@ from app.config import get_settings
 from app.envelope import ApiError, access_denied
 from app.models import User
 from app.security import SlidingWindowLimiter
+from app.services import jobs as job_service
 from app.services import projects as project_service
 from app.services import snapshot_creation
 from app.services.archive_security import (
@@ -151,6 +153,7 @@ def upload_source(
         inspection = inspect_tree(workdir, set(SKIP_DIRS))
 
         indexed: list[ValidatedEntry] = []
+        secrets: list[ValidatedEntry] = []
         skipped_dirs: dict[str, int] = {}
         secrets_excluded = 0
         for entry in extracted:
@@ -160,6 +163,7 @@ def upload_source(
                 continue
             if is_secret_file(entry.path.rsplit("/", 1)[-1]):
                 secrets_excluded += 1
+                secrets.append(entry)
                 continue
             indexed.append(entry)
 
@@ -221,19 +225,70 @@ def upload_source(
             ),
             project_runtime_profile=runtime_profile(inspection),
             store=active_store,
+            security_extra=secrets,
         )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+    # Synchronous pipeline: every stage completed in this request, so all
+    # rows share one honest finished_at rather than fabricated stagger.
+    finished_at = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+    secret_note = f", {secrets_excluded} secret file(s) excluded" if secrets_excluded else ""
+    # Security preflight (D65): every ready ZIP snapshot gets exactly one
+    # internal scan job. Enqueue failure fails the upload loudly — a
+    # ready snapshot must never silently skip its assessment.
+    preflight: dict = {"status": "disabled"}
+    if settings.preflight_enabled:
+        preflight_job, _created = job_service.enqueue_security_preflight(
+            session, user, project.workspace_id, snapshot.id
+        )
+        preflight = {"status": "queued", "job_id": preflight_job["id"]}
     return {
         "snapshot": project_service.serialize_snapshot_summary(snapshot),
+        "preflight": preflight,
         "inspection": {
             "stages": [
-                {"key": "received", "status": "completed"},
-                {"key": "validated", "status": "completed"},
-                {"key": "extracted", "status": "completed"},
-                {"key": "inspected", "status": "completed"},
-                {"key": "stored", "status": "completed"},
-                {"key": "snapshot_created", "status": "completed"},
+                {
+                    "key": "received",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": f"{len(data)} bytes received.",
+                },
+                {
+                    "key": "validated",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": (
+                        f"{len(report.entries)} entries, "
+                        f"{report.total_uncompressed} bytes uncompressed."
+                    ),
+                },
+                {
+                    "key": "extracted",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": f"{len(extracted)} files extracted.",
+                },
+                {
+                    "key": "inspected",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": (
+                        f"{len(inspection.languages)} language(s), "
+                        f"{len(inspection.frameworks)} framework(s) detected."
+                    ),
+                },
+                {
+                    "key": "stored",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": f"{snapshot.storage_bytes} bytes stored.",
+                },
+                {
+                    "key": "snapshot_created",
+                    "status": "completed",
+                    "finished_at": finished_at,
+                    "detail": f"{len(indexed)} files indexed{secret_note}.",
+                },
             ],
             "manifest": manifest,
         },

@@ -35,8 +35,9 @@ ORIGINAL = {"src/app.py": "print(1)\n", "README.md": "# demo\n"}
 
 
 @pytest.fixture()
-def db_session():  # type: ignore[no-untyped-def]
-    engine = create_engine(os.environ["DATABASE_URL"])
+def db_session(migrated_db: str):  # type: ignore[no-untyped-def]
+    # Same database the API clients use: service sessions must see API rows.
+    engine = create_engine(migrated_db)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     session = factory()
     try:

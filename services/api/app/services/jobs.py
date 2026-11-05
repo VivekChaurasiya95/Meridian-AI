@@ -12,6 +12,7 @@ credentials to protect (D45).
 
 import base64
 import datetime as dt
+import json
 import logging
 import re
 import uuid
@@ -26,7 +27,23 @@ from app.models import Job, JobStage, Project, User, WorkspaceMember
 
 logger = logging.getLogger("meridian.jobs")
 
-JOB_TYPES = ("lifecycle_test", "manifest_recheck", "sandbox_smoke", "git_preview", "git_import")
+JOB_TYPES = (
+    "lifecycle_test",
+    "manifest_recheck",
+    "sandbox_smoke",
+    "git_preview",
+    "git_import",
+    "security_preflight",
+    "investigation",
+)
+
+IDEMPOTENCY_PATTERN = re.compile(r"[A-Za-z0-9_.\-]{1,128}")
+
+# Preflight scan profiles and policy versions the backend accepts. The
+# frontend never selects images, commands, or paths; these names only
+# pick server-defined behavior.
+PREFLIGHT_SCAN_PROFILES = ("initial_preflight",)
+PREFLIGHT_POLICY_VERSIONS = ("preflight-v1",)
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
@@ -72,6 +89,42 @@ KNOWN_STAGE_KEYS = (
 )
 
 CONTRIBUTOR_ROLES = frozenset({"owner", "admin", "developer"})
+
+# JSON bounds (M4 hardening): payloads, results, and stage summaries live in
+# JSONB rows read on every poll, so unbounded objects would bloat the queue
+# and let one caller DoS every reader. Caps are generous for real use —
+# lifecycle notes, digests, excerpts — and fail closed past them.
+MAX_PAYLOAD_BYTES = 32 * 1024
+MAX_RESULT_BYTES = 64 * 1024
+MAX_SUMMARY_BYTES = 16 * 1024
+MAX_JSON_KEYS = 200
+MAX_JSON_DEPTH = 10
+
+
+def check_json_bounds(value: dict, *, max_bytes: int, label: str) -> None:
+    """Reject oversized, over-wide, over-deep, or unserializable JSON objects.
+
+    Pure and unit-tested; raises 422 VALIDATION_ERROR on any violation.
+    """
+    total_keys = 0
+    stack: list[tuple[object, int]] = [(value, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > MAX_JSON_DEPTH:
+            raise ApiError(422, "VALIDATION_ERROR", f"The job {label} is nested too deeply.")
+        if isinstance(node, dict):
+            total_keys += len(node)
+            if total_keys > MAX_JSON_KEYS:
+                raise ApiError(422, "VALIDATION_ERROR", f"The job {label} has too many keys.")
+            stack.extend((child, depth + 1) for child in node.values())
+        elif isinstance(node, list):
+            stack.extend((child, depth + 1) for child in node)
+    try:
+        encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError):
+        raise ApiError(422, "VALIDATION_ERROR", f"The job {label} is not valid JSON.") from None
+    if len(encoded.encode("utf-8")) > max_bytes:
+        raise ApiError(422, "VALIDATION_ERROR", f"The job {label} exceeds the size limit.")
 
 
 def _iso(value: dt.datetime | None) -> str | None:
@@ -186,13 +239,14 @@ def submit_job(
         raise ApiError(422, "VALIDATION_ERROR", "The job type is not supported.")
     if not isinstance(payload, dict):
         raise ApiError(422, "VALIDATION_ERROR", "The job payload must be an object.")
+    check_json_bounds(payload, max_bytes=MAX_PAYLOAD_BYTES, label="payload")
     settings = get_settings()
     attempts_cap = max_attempts if max_attempts is not None else settings.job_max_attempts
     if attempts_cap < 1 or attempts_cap > 25:
         raise ApiError(422, "VALIDATION_ERROR", "max_attempts is out of range.")
     if priority < 0 or priority > 1000:
         raise ApiError(422, "VALIDATION_ERROR", "priority is out of range.")
-    if idempotency_key is not None and not re.fullmatch(r"[A-Za-z0-9_.\-]{1,128}", idempotency_key):
+    if idempotency_key is not None and not IDEMPOTENCY_PATTERN.fullmatch(idempotency_key):
         raise ApiError(422, "VALIDATION_ERROR", "The idempotency key is invalid.")
     project_id: uuid.UUID | None = None
     if job_type in ("git_preview", "git_import"):
@@ -234,7 +288,7 @@ def submit_job(
                 **({"branch": payload["branch"]} if payload.get("branch") else {}),
                 **({"commit_sha": payload["commit_sha"]} if payload.get("commit_sha") else {}),
             }
-    if job_type in ("manifest_recheck", "sandbox_smoke"):
+    if job_type in ("manifest_recheck", "sandbox_smoke", "security_preflight"):
         raw_snapshot = payload.get("snapshot_id")
         try:
             snapshot_id = uuid.UUID(str(raw_snapshot))
@@ -264,6 +318,62 @@ def submit_job(
             )
         ).scalar_one()
         project_id = project_row
+    if job_type == "security_preflight":
+        scan_profile = payload.get("scan_profile", "initial_preflight")
+        policy_version = payload.get("policy_version", "preflight-v1")
+        if scan_profile not in PREFLIGHT_SCAN_PROFILES:
+            raise ApiError(422, "VALIDATION_ERROR", "The scan profile is not supported.")
+        if policy_version not in PREFLIGHT_POLICY_VERSIONS:
+            raise ApiError(422, "VALIDATION_ERROR", "The policy version is not supported.")
+        payload = {
+            "snapshot_id": str(snapshot_id),
+            "scan_profile": scan_profile,
+            "policy_version": policy_version,
+        }
+    if job_type == "investigation":
+        from app.models import Investigation
+
+        try:
+            investigation_id = uuid.UUID(str(payload.get("investigation_id")))
+        except (ValueError, TypeError, AttributeError):
+            raise ApiError(422, "VALIDATION_ERROR", "investigation needs an id.") from None
+        visible_inv = (
+            session.execute(
+                select(Investigation.id, Investigation.project_id)
+                .join(Project, Project.id == Investigation.project_id)
+                .join(
+                    WorkspaceMember,
+                    WorkspaceMember.workspace_id == Project.workspace_id,
+                )
+                .where(
+                    Investigation.id == investigation_id,
+                    Project.workspace_id == workspace_id,
+                    WorkspaceMember.workspace_id == workspace_id,
+                    WorkspaceMember.user_id == user.id,
+                )
+            )
+        ).one_or_none()
+        if visible_inv is None:
+            raise not_found("investigation")
+        project_id = visible_inv[1]
+        from_stage = payload.get("from_stage")
+        # Mirrors investigations.RETRYABLE_FROM (import would cycle).
+        if from_stage is not None and from_stage not in (
+            "project_inspection",
+            "reproduction",
+            "evidence_analysis",
+            "hypothesis_review",
+            "regression_test_creation",
+            "baseline_test_execution",
+            "patch_proposal",
+            "awaiting_user_approval",
+            "patch_application",
+            "post_patch_verification",
+        ):
+            raise ApiError(422, "VALIDATION_ERROR", "The retry stage is not supported.")
+        payload = {"investigation_id": str(investigation_id)}
+        if from_stage is not None:
+            payload["from_stage"] = from_stage
 
     if idempotency_key:
         existing = (
@@ -315,6 +425,29 @@ def submit_job(
     session.refresh(job)
     logger.info("job created job_id=%s workspace_id=%s type=%s", job.id, workspace_id, job_type)
     return serialize_job(job), True
+
+
+def enqueue_security_preflight(
+    session: Session,
+    user: User,
+    workspace_id: uuid.UUID,
+    snapshot_id: uuid.UUID,
+    scan_profile: str = "initial_preflight",
+    policy_version: str = "preflight-v1",
+) -> tuple[dict, bool]:
+    """Enqueue the internal preflight job for a READY snapshot (D65).
+
+    Idempotent on (snapshot, profile, policy): duplicate uploads and
+    retried callbacks reuse the original job instead of stacking scans.
+    Callers must pass ready snapshots only; the worker re-verifies.
+    """
+    payload = {
+        "snapshot_id": str(snapshot_id),
+        "scan_profile": scan_profile,
+        "policy_version": policy_version,
+    }
+    key = f"preflight.{snapshot_id}.{scan_profile}.{policy_version}"
+    return submit_job(session, user, workspace_id, "security_preflight", payload, key, 0, None)
 
 
 def get_job(session: Session, user: User, job_id: uuid.UUID) -> dict:
@@ -376,6 +509,36 @@ def cancel_job(session: Session, user: User, job_id: uuid.UUID) -> dict:
     session.commit()
     session.refresh(job)
     logger.info("job cancelled job_id=%s by user", job.id)
+    return serialize_job(job)
+
+
+def cancel_job_as_worker(session: Session, job_id: uuid.UUID, worker_id: str) -> dict:
+    """Worker-side cancellation for cooperative aborts (M6).
+
+    Only the owning worker of a live job may cancel it; anything else
+    answers LEASE_LOST. A cancelled job is never requeued.
+    """
+    now = _db_now(session)
+    job = (
+        session.execute(
+            select(Job)
+            .where(
+                Job.id == job_id,
+                Job.worker_id == worker_id,
+                Job.status == "running",
+                Job.lease_expires_at > now,
+            )
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
+    if job is None:
+        raise ApiError(409, "LEASE_LOST", "Only the owning worker can cancel a live job.")
+    job.status = "cancelled"
+    job.completed_at = now
+    job.updated_at = now
+    session.commit()
+    session.refresh(job)
+    logger.info("job cancelled job_id=%s by worker", job.id)
     return serialize_job(job)
 
 
@@ -518,6 +681,7 @@ def complete_job(session: Session, job_id: uuid.UUID, worker_id: str, result: di
     so a cancelled job can never be completed by a stale worker."""
     if not isinstance(result, dict):
         raise ApiError(422, "VALIDATION_ERROR", "The job result must be an object.")
+    check_json_bounds(result, max_bytes=MAX_RESULT_BYTES, label="result")
     now = _db_now(session)
     job = (
         session.execute(
@@ -635,6 +799,8 @@ def record_stage(
         raise ApiError(422, "VALIDATION_ERROR", "The stage status is not supported.")
     if result_summary is not None and not isinstance(result_summary, dict):
         raise ApiError(422, "VALIDATION_ERROR", "The stage result must be an object.")
+    if result_summary is not None:
+        check_json_bounds(result_summary, max_bytes=MAX_SUMMARY_BYTES, label="stage summary")
     job = (
         session.execute(
             select(Job).where(Job.id == job_id, Job.worker_id == worker_id, Job.status == "running")

@@ -22,10 +22,15 @@ def normalize_request_id(value: str | None) -> str:
     return new_request_id()
 
 
-def ok(data: Any, request_id: str, status_code: int = 200) -> JSONResponse:
+def ok(
+    data: Any, request_id: str, status_code: int = 200, links: dict[str, str] | None = None
+) -> JSONResponse:
+    content: dict[str, Any] = {"data": data, "request_id": request_id}
+    if links:
+        content["links"] = links
     return JSONResponse(
         status_code=status_code,
-        content={"data": data, "request_id": request_id},
+        content=content,
         headers={REQUEST_ID_HEADER: request_id},
     )
 

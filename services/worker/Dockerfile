@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir ./services/api
 
 COPY services/worker/main.py ./services/worker/main.py
 COPY services/worker/sandbox ./services/worker/sandbox
+COPY services/worker/security ./services/worker/security
 
 # Isolated unprivileged execution user (ADR-006: non-root execution).
 # M5+ untrusted execution must run as an even more restricted identity.

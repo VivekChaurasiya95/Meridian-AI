@@ -1,6 +1,5 @@
 """Job endpoint + lifecycle tests (M4): submit, claim, lease, retry, stages."""
 
-import os
 import threading
 import uuid
 
@@ -14,8 +13,9 @@ from app.services import jobs as job_service
 
 
 @pytest.fixture()
-def db_session():
-    engine = create_engine(os.environ["DATABASE_URL"])
+def db_session(migrated_db: str):
+    # Same database the API clients use: service sessions must see API rows.
+    engine = create_engine(migrated_db)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     session = factory()
     try:
@@ -123,14 +123,16 @@ def test_claim_is_exclusive(auth_client: TestClient, db_session: Session) -> Non
     assert job_service.claim_job(db_session, "worker-b", ("lifecycle_test",), 60) is None
 
 
-def test_concurrent_claim_single_winner(auth_client: TestClient, db_session: Session) -> None:
+def test_concurrent_claim_single_winner(
+    auth_client: TestClient, db_session: Session, migrated_db: str
+) -> None:
     workspace = make_workspace(auth_client)
     submit(auth_client, workspace["id"])
     winners: list = []
     barrier = threading.Barrier(2)
 
     def attempt(worker: str) -> None:
-        engine = create_engine(os.environ["DATABASE_URL"])
+        engine = create_engine(migrated_db)
         factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
         session = factory()
         try:
@@ -304,4 +306,33 @@ def test_invalid_workspace_cap_rejected(auth_client: TestClient, db_session: Ses
     assert submit(auth_client, ws["id"]).status_code == 201
     with pytest.raises(ApiError) as exc_info:
         job_service.claim_job(db_session, "w-x", ("lifecycle_test",), 60, workspace_cap=0)
+    assert exc_info.value.code == "VALIDATION_ERROR"
+
+
+def test_submit_rejects_oversized_payload(auth_client: TestClient) -> None:
+    workspace = make_workspace(auth_client, "wspay")
+    response = submit(auth_client, workspace["id"], payload={"blob": "x" * 40_000})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_complete_and_stage_reject_oversized_objects(
+    auth_client: TestClient, db_session: Session
+) -> None:
+    workspace = make_workspace(auth_client, "wsbig")
+    job = submit(auth_client, workspace["id"]).json()["data"]
+    job_id = uuid.UUID(job["id"])
+    job_service.claim_job(db_session, "w-big", ("lifecycle_test",), 60)
+    with pytest.raises(ApiError) as exc_info:
+        job_service.complete_job(db_session, job_id, "w-big", {"blob": "x" * 70_000})
+    assert exc_info.value.code == "VALIDATION_ERROR"
+    with pytest.raises(ApiError) as exc_info:
+        job_service.record_stage(
+            db_session,
+            job_id,
+            "w-big",
+            "execute",
+            "running",
+            result_summary={"blob": "x" * 20_000},
+        )
     assert exc_info.value.code == "VALIDATION_ERROR"

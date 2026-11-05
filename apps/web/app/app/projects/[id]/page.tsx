@@ -15,20 +15,28 @@ import {
 import {
   MeridianApiError,
   archiveProject,
+  createInvestigation,
   deleteProject,
   formatBytes,
   formatTimestamp,
   getFilePreview,
+  getJob,
   getProject,
   getSnapshot,
   getTree,
+  listInvestigations,
   listSnapshots,
+  submitJob,
   unarchiveProject,
   updateProject,
   uploadProjectArchive,
+  validateGitUrl,
 } from "@/lib/api";
 import type {
   FilePreview,
+  Investigation,
+  InvestigationSeverity,
+  InvestigationStatus,
   Project,
   SnapshotDetail,
   SnapshotStorageStatus,
@@ -49,7 +57,7 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; project: Project };
 
-const TABS = ["overview", "repository", "snapshots", "settings"] as const;
+const TABS = ["overview", "repository", "snapshots", "investigations", "settings"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -602,6 +610,206 @@ function SnapshotsTab({ project }: { project: Project }) {
   );
 }
 
+const INVESTIGATION_TONE: Record<
+  InvestigationStatus,
+  "success" | "info" | "warning" | "danger" | "neutral"
+> = {
+  queued: "neutral",
+  running: "info",
+  awaiting_approval: "warning",
+  completed: "success",
+  failed: "danger",
+  blocked: "warning",
+  inconclusive: "warning",
+  cancelled: "neutral",
+};
+
+const SEVERITIES: InvestigationSeverity[] = ["low", "medium", "high", "critical", "unspecified"];
+
+function InvestigationsTab({ project }: { project: Project }) {
+  const [items, setItems] = React.useState<Investigation[] | null>(null);
+  const [snapshots, setSnapshots] = React.useState<SnapshotSummary[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [formError, setFormError] = React.useState<string | null>(null);
+  const [creating, setCreating] = React.useState(false);
+  const [title, setTitle] = React.useState("");
+  const [bugReport, setBugReport] = React.useState("");
+  const [severity, setSeverity] = React.useState<InvestigationSeverity>("unspecified");
+  const [snapshotId, setSnapshotId] = React.useState("");
+  const [route, setRoute] = React.useState("/");
+
+  React.useEffect(() => {
+    let live = true;
+    listInvestigations(project.id)
+      .then((rows) => {
+        if (live) setItems(rows);
+      })
+      .catch((err: unknown) => {
+        if (live) setError(err instanceof Error ? err.message : "Could not load investigations.");
+      });
+    listSnapshots(project.id)
+      .then((page) => {
+        if (!live) return;
+        setSnapshots(page.items);
+        const firstReady = page.items.find((item) => item.storage_status === "ready");
+        if (firstReady !== undefined) setSnapshotId(firstReady.id);
+      })
+      .catch(() => {
+        if (live) setSnapshots([]);
+      });
+    return () => {
+      live = false;
+    };
+  }, [project.id]);
+
+  async function onCreate(event: React.FormEvent) {
+    event.preventDefault();
+    setCreating(true);
+    setFormError(null);
+    try {
+      const created = await createInvestigation(
+        project.id,
+        {
+          title: title.trim(),
+          bug_report: bugReport.trim(),
+          severity,
+          repository_snapshot_id: snapshotId,
+          reproduction_context: { route: route.trim() || "/" },
+        },
+        `ui-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      );
+      setItems((prev) => (prev === null ? [created] : [created, ...prev]));
+      setTitle("");
+      setBugReport("");
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Could not create the investigation.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-3">
+        <h2 className="text-[15px] font-semibold">Open a case</h2>
+        {formError !== null && (
+          <Alert tone="danger" title="Could not create">
+            {formError}
+          </Alert>
+        )}
+        <form onSubmit={onCreate} className="flex flex-col gap-3">
+          <Input
+            label="Title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="What is broken?"
+            maxLength={200}
+          />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="inv-bug-report" className="text-[13px] font-semibold text-ink">
+              Bug report
+            </label>
+            <textarea
+              id="inv-bug-report"
+              value={bugReport}
+              onChange={(event) => setBugReport(event.target.value)}
+              placeholder="Steps to reproduce, expected versus actual behavior."
+              rows={5}
+              maxLength={20000}
+              className="w-full rounded-[10px] border border-line bg-surface-1 px-3.5 py-2.5 text-[14px] text-ink shadow-[inset_0_1px_2px_rgb(64_45_20/0.06)] transition-all duration-200 outline-none placeholder:text-ink-3 hover:border-line-strong focus:border-accent focus:bg-inset focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_22%,transparent)]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="inv-severity" className="text-[13px] font-semibold text-ink">
+                Severity
+              </label>
+              <select
+                id="inv-severity"
+                value={severity}
+                onChange={(event) => setSeverity(event.target.value as InvestigationSeverity)}
+                className="h-10 w-full rounded-[10px] border border-line bg-surface-1 px-3.5 text-[14px] text-ink outline-none focus:border-accent"
+              >
+                {SEVERITIES.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="Route"
+              value={route}
+              onChange={(event) => setRoute(event.target.value)}
+              placeholder="/login"
+              maxLength={200}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="inv-snapshot" className="text-[13px] font-semibold text-ink">
+              Snapshot
+            </label>
+            <select
+              id="inv-snapshot"
+              value={snapshotId}
+              onChange={(event) => setSnapshotId(event.target.value)}
+              className="h-10 w-full rounded-[10px] border border-line bg-surface-1 px-3.5 text-[14px] text-ink outline-none focus:border-accent"
+            >
+              {(snapshots ?? []).map((snapshot) => (
+                <option key={snapshot.id} value={snapshot.id}>
+                  {snapshot.archive_name} · {snapshot.storage_status}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={creating || title.trim() === "" || bugReport.trim() === "" || snapshotId === ""}
+            >
+              {creating ? "Opening…" : "Open investigation"}
+            </Button>
+          </div>
+        </form>
+      </div>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-[15px] font-semibold">Cases</h2>
+        {error !== null && (
+          <Alert tone="danger" title="Could not load">
+            {error}
+          </Alert>
+        )}
+        {items === null ? (
+          <Skeleton className="h-24" />
+        ) : items.length === 0 ? (
+          <p className="text-[13px] text-ink-3">No investigations yet — open the first case.</p>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {items.map((item) => (
+              <li key={item.id}>
+                <Link href={`/app/investigations/${item.id}`}>
+                  <Card className="flex flex-wrap items-center gap-2 p-4 transition-colors hover:border-line-strong">
+                    <Badge tone={INVESTIGATION_TONE[item.status]} dot={false}>
+                      {item.status.replace("_", " ")}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+                      {item.title}
+                    </span>
+                    <span className="font-mono text-xs text-ink-3">
+                      {formatTimestamp(item.created_at)}
+                    </span>
+                  </Card>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SettingsTab({
   project,
   onChanged,
@@ -623,6 +831,11 @@ function SettingsTab({
   const [uploadFraction, setUploadFraction] = React.useState<number | null>(null);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploadDone, setUploadDone] = React.useState(false);
+  const [gitUrl, setGitUrl] = React.useState(project.repository_url ?? "");
+  const [gitBranch, setGitBranch] = React.useState(project.default_branch ?? "");
+  const [gitBusy, setGitBusy] = React.useState(false);
+  const [gitError, setGitError] = React.useState<string | null>(null);
+  const [gitDone, setGitDone] = React.useState<string | null>(null);
 
   const canManage = project.role === "owner" || project.role === "admin";
   const canUpload = project.role !== "viewer";
@@ -646,6 +859,51 @@ function SettingsTab({
     } finally {
       setUploading(false);
       setUploadFraction(null);
+    }
+  }
+  async function handleGitFetch() {
+    if (gitBusy || uploading) return;
+    const url = gitUrl.trim();
+    if (!url) {
+      setGitError("Enter a public GitHub repository URL.");
+      return;
+    }
+    setGitBusy(true);
+    setGitError(null);
+    setGitDone(null);
+    try {
+      const valid = await validateGitUrl(url);
+      const branch = gitBranch.trim();
+      const job = await submitJob(project.workspace_id, {
+        job_type: "git_import",
+        payload: {
+          project_id: project.id,
+          repository_url: valid.canonical_url,
+          ...(branch ? { branch } : {}),
+        },
+      });
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await getJob(job.id);
+        if (current.status === "completed") {
+          const sha = current.result?.commit_sha;
+          onChanged(await getProject(project.id));
+          setGitDone(
+            typeof sha === "string" && sha
+              ? `Snapshot stored from ${valid.canonical_url} at ${sha.slice(0, 7)}. Open the Snapshots tab to inspect it.`
+              : `Snapshot stored from ${valid.canonical_url}. Open the Snapshots tab to inspect it.`,
+          );
+          return;
+        }
+        if (current.status === "failed" || current.status === "cancelled") {
+          throw new Error(current.error_message ?? "Could not fetch this repository.");
+        }
+      }
+      throw new Error("The import is taking longer than expected. Check the Snapshots tab again shortly.");
+    } catch (err) {
+      setGitError(err instanceof Error ? err.message : "Could not fetch this repository.");
+    } finally {
+      setGitBusy(false);
     }
   }
   const canDelete = project.role === "owner";
@@ -741,43 +999,86 @@ function SettingsTab({
       <Card>
         <CardHeader>
           <CardTitle>Source archive</CardTitle>
-          <CardDescription>Upload a ZIP archive to create a new immutable snapshot. Validated, inspected, and stored on upload.</CardDescription>
+          <CardDescription>Upload a ZIP archive or fetch a public GitHub repository to create a new immutable snapshot. Validated, inspected, and stored on arrival.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-4">
           {uploadError && <Alert tone="danger" title="Upload failed">{uploadError}</Alert>}
           {uploadDone && (
             <p className="flex items-center gap-1.5 text-[13px] font-medium text-success" role="status">
               <Check aria-hidden="true" className="size-4" /> Snapshot stored. Open the Snapshots tab to inspect it.
             </p>
           )}
+          {gitError && <Alert tone="danger" title="Fetch failed">{gitError}</Alert>}
+          {gitDone && (
+            <p className="flex items-center gap-1.5 text-[13px] font-medium text-success" role="status">
+              <Check aria-hidden="true" className="size-4" /> {gitDone}
+            </p>
+          )}
           {canUpload && project.status === "active" ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button
-                variant="secondary"
-                loading={uploading}
-                onClick={() => archiveInputRef.current?.click()}
-              >
-                {uploading && uploadFraction !== null
-                  ? `Uploading… ${Math.round(uploadFraction * 100)}%`
-                  : "Upload ZIP archive"}
-              </Button>
-              <input
-                ref={archiveInputRef}
-                type="file"
-                accept=".zip,application/zip"
-                className="sr-only"
-                aria-label="Choose a ZIP archive"
-                onChange={(event) => {
-                  void handleArchiveFile(event.target.files?.[0] ?? null);
-                  event.target.value = "";
-                }}
-              />
-            </div>
+            <>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <Button
+                  variant="secondary"
+                  loading={uploading}
+                  onClick={() => archiveInputRef.current?.click()}
+                >
+                  {uploading && uploadFraction !== null
+                    ? `Uploading… ${Math.round(uploadFraction * 100)}%`
+                    : "Upload ZIP archive"}
+                </Button>
+                <input
+                  ref={archiveInputRef}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sr-only"
+                  aria-label="Choose a ZIP archive"
+                  onChange={(event) => {
+                    void handleArchiveFile(event.target.files?.[0] ?? null);
+                    event.target.value = "";
+                  }}
+                />
+              </div>
+              <div aria-hidden="true" className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-line/70" />
+                <span className="font-mono text-[11px] tracking-wide text-ink-3 uppercase">or fetch from GitHub</span>
+                <span className="h-px flex-1 bg-line/70" />
+              </div>
+              <div className="flex flex-col gap-3">
+                <Input
+                  label="Repository URL"
+                  placeholder="https://github.com/owner/repository"
+                  value={gitUrl}
+                  onChange={(event) => setGitUrl(event.target.value)}
+                  maxLength={2048}
+                  disabled={gitBusy}
+                />
+                <Input
+                  label="Branch (optional)"
+                  placeholder="Defaults to the repository's default branch"
+                  value={gitBranch}
+                  onChange={(event) => setGitBranch(event.target.value)}
+                  maxLength={256}
+                  disabled={gitBusy}
+                />
+                <div>
+                  <Button
+                    variant="secondary"
+                    loading={gitBusy}
+                    onClick={() => void handleGitFetch()}
+                  >
+                    {gitBusy ? "Fetching…" : "Fetch from GitHub"}
+                  </Button>
+                </div>
+                <p className="text-[12px] leading-5 text-ink-3">
+                  Public GitHub repositories only. The branch is pinned to its exact commit at import.
+                </p>
+              </div>
+            </>
           ) : (
             <p className="text-[13px] text-ink-2">
               {project.status !== "active"
-                ? "Archived projects do not accept new uploads."
-                : `Your role (${project.role}) cannot upload archives.`}
+                ? "Archived projects do not accept new snapshots."
+                : `Your role (${project.role}) cannot add snapshots.`}
             </p>
           )}
         </CardContent>
@@ -1025,6 +1326,7 @@ export default function ProjectDetailPage() {
         {activeTab === "overview" && <OverviewTab project={project} />}
         {activeTab === "repository" && <RepositoryTab project={project} />}
         {activeTab === "snapshots" && <SnapshotsTab project={project} />}
+        {activeTab === "investigations" && <InvestigationsTab project={project} />}
         {activeTab === "settings" && (
           <SettingsTab
             project={project}
