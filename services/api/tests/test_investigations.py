@@ -105,6 +105,7 @@ def test_create_returns_202_with_links_and_job(auth_client: TestClient) -> None:
         "hypotheses": 0,
         "patches": 0,
         "verification_runs": 0,
+        "reports": 0,
     }
     stages = auth_client.get(f"/api/v1/investigations/{data['id']}/stages").json()["data"]
     assert stages == []
@@ -295,6 +296,27 @@ def test_workspace_investigations_route_present() -> None:
         if getattr(route, "path", "") == "/api/v1/workspaces/{workspace_id}/investigations"
     )
     assert found == [(["GET"], "/api/v1/workspaces/{workspace_id}/investigations")]
+
+
+def test_workspace_investigations_route_mounted_on_app() -> None:
+    """Full-app assertion: the workspace index route is reachable on the app.
+
+    The router-level check above still passes when ``main.create_app()``
+    forgets ``include_router(investigations.router)`` — the exact failure
+    that surfaces in the browser as a bare ``Request failed with status
+    404`` (FastAPI's default ``{"detail": "Not Found"}`` body, not the
+    ``{error, request_id}`` envelope). Assert the mounted table instead.
+    """
+    _stub_missing_crypto()
+    from app.main import create_app
+
+    application = create_app()
+    mounted = sorted(
+        (sorted(getattr(route, "methods", set())), getattr(route, "path", ""))
+        for route in application.routes
+        if getattr(route, "path", "") == "/api/v1/workspaces/{workspace_id}/investigations"
+    )
+    assert mounted == [(["GET"], "/api/v1/workspaces/{workspace_id}/investigations")]
 
 
 def test_terminal_transition_refused(auth_client: TestClient, db_session_factory) -> None:  # type: ignore[no-untyped-def]

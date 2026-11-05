@@ -9,7 +9,14 @@ import { MeridianApiError, formatTimestamp, getLatestInvestigationReport } from 
 import type { InvestigationReport } from "@/lib/types";
 
 /** Latest narrative report for the investigation (M9). Hidden until one exists. */
-export function LatestReportCard({ investigationId }: { investigationId: string }) {
+export function LatestReportCard({
+  investigationId,
+  reportCount,
+}: {
+  investigationId: string;
+  /** M9 summaries on record; when 0 no /report fetch fires (it would 404). */
+  reportCount: number;
+}) {
   const [report, setReport] = React.useState<InvestigationReport | null>(null);
   const [missing, setMissing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -29,10 +36,11 @@ export function LatestReportCard({ investigationId }: { investigationId: string 
   }, [investigationId]);
 
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    if (reportCount > 0) void load();
+    else setMissing(true);
+  }, [load, reportCount]);
 
-  if (missing) return null;
+  if (missing || reportCount === 0) return null;
 
   if (error !== null && report === null) {
     return (

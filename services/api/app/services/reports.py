@@ -22,7 +22,7 @@ import tempfile
 import uuid
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -122,6 +122,15 @@ def get_latest_report(session: Session, user: User, investigation_id: uuid.UUID)
     if row is None:
         raise not_found("report")
     return serialize_report(row)
+
+
+def report_count(session: Session, investigation_id: uuid.UUID) -> int:
+    """Number of M9 model-written summaries (for investigation detail counts)."""
+    return (
+        session.execute(
+            select(func.count()).where(InvestigationReport.investigation_id == investigation_id)
+        )
+    ).scalar_one()
 
 
 # M10 file reports: deterministic md/html rendered from persisted rows.

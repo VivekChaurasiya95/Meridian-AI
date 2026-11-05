@@ -25,7 +25,14 @@ const STATUS_TONE: Record<string, "success" | "info" | "warning" | "danger" | "n
 const TEST_TYPES = ["e2e", "unit", "integration", "regression", "manual"];
 
 /** Regression tests: worker-driven checks plus manual test ideas (M8). */
-export function TestsSection({ investigationId }: { investigationId: string }) {
+export function TestsSection({
+  investigationId,
+  canPropose,
+}: {
+  investigationId: string;
+  /** False on terminal investigations: the API 409s new tests, so offer none. */
+  canPropose: boolean;
+}) {
   const toast = useToast();
   const [tests, setTests] = React.useState<RegressionTest[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -108,11 +115,13 @@ export function TestsSection({ investigationId }: { investigationId: string }) {
         <h2 className="text-[15px] font-semibold">
           Regression tests {tests.length > 0 && `(${tests.length})`}
         </h2>
-        <span className="ml-auto">
-          <Button size="sm" variant="secondary" onClick={() => setFormOpen((open) => !open)}>
-            {formOpen ? "Close" : "Propose test"}
-          </Button>
-        </span>
+        {canPropose && (
+          <span className="ml-auto">
+            <Button size="sm" variant="secondary" onClick={() => setFormOpen((open) => !open)}>
+              {formOpen ? "Close" : "Propose test"}
+            </Button>
+          </span>
+        )}
       </div>
 
       {actionError !== null && (
@@ -123,7 +132,7 @@ export function TestsSection({ investigationId }: { investigationId: string }) {
         </div>
       )}
 
-      {formOpen && (
+      {formOpen && canPropose && (
         <Card className="mb-2 flex flex-col gap-3 p-4">
           <h3 className="text-[14px] font-semibold">Propose a test idea</h3>
           <p className="text-[13px] text-ink-2">
@@ -187,7 +196,9 @@ export function TestsSection({ investigationId }: { investigationId: string }) {
 
       {tests.length === 0 ? (
         <p className="text-[13px] text-ink-3">
-          No tests yet — the pipeline proposes e2e checks after review, or propose one above.
+          {canPropose
+            ? "No tests yet — the pipeline proposes e2e checks after review, or propose one above."
+            : "No tests were proposed before this investigation ended."}
         </p>
       ) : (
         <ol className="flex flex-col gap-2">

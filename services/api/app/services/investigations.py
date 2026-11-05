@@ -440,6 +440,7 @@ def get_investigation(session: Session, user: User, investigation_id: uuid.UUID)
     """Detail with linked counts. Unbuilt milestones stay honest zeros."""
     from app.services import hypotheses as hypothesis_service
     from app.services import patches as patch_service
+    from app.services import reports as report_service
     from app.services import verification as verification_service
 
     inv, role = investigation_access(session, user, investigation_id)
@@ -449,6 +450,9 @@ def get_investigation(session: Session, user: User, investigation_id: uuid.UUID)
         "hypotheses": hypothesis_service.hypothesis_count(session, inv.id),
         "patches": patch_service.patch_count(session, inv.id),
         "verification_runs": verification_service.run_count(session, inv.id),
+        # M9 model-written summaries (not M10 file reports): lets the UI skip
+        # the singleton /report fetch when no summary can exist (else a 404).
+        "reports": report_service.report_count(session, inv.id),
     }
     return data
 

@@ -73,9 +73,16 @@ export default function InvestigationsPage() {
         const { items: list } = await listWorkspaces(100);
         if (cancelled) return;
         setWorkspaces(list);
-        if (workspaceParam) setWorkspaceId(workspaceParam);
-        else if (list.length > 0) setWorkspaceId(list[0].id);
-        else setLoading(false);
+        const validParam =
+          workspaceParam !== null ? list.find((workspace) => workspace.id === workspaceParam) : undefined;
+        if (validParam) setWorkspaceId(validParam.id);
+        else if (list.length > 0) {
+          setWorkspaceId(list[0].id);
+          // Never request investigations for a stale/foreign id from ?workspace=:
+          // that answers 404 and looks exactly like the missing-route outage.
+          if (workspaceParam !== null)
+            router.replace(`/app/investigations?workspace=${list[0].id}`);
+        } else setLoading(false);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof MeridianApiError && err.status === 401) {
@@ -115,10 +122,11 @@ export default function InvestigationsPage() {
   );
 
   React.useEffect(() => {
-    if (!workspaceId) return;
+    // Wait for the workspace list so a stale ?workspace= id is never requested.
+    if (!workspaceId || workspaces === null) return;
     setLoading(true);
     void refresh(workspaceId, false);
-  }, [workspaceId, refresh]);
+  }, [workspaceId, workspaces, refresh]);
 
   const live = items.some(
     (investigation) =>

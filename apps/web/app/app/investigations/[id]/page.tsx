@@ -421,7 +421,7 @@ export default function InvestigationDetailPage() {
         )}
       </section>
 
-      <TestsSection investigationId={id} />
+      <TestsSection investigationId={id} canPropose={!terminal} />
 
       <VerificationSection investigationId={id} />
 
@@ -429,7 +429,7 @@ export default function InvestigationDetailPage() {
 
       <ReportsSection investigationId={id} />
 
-      <LatestReportCard investigationId={id} />
+      <LatestReportCard investigationId={id} reportCount={detail.counts.reports} />
 
       <section aria-label="Activity">
         <h2 className="mb-2 text-[15px] font-semibold">Activity</h2>

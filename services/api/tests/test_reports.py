@@ -144,6 +144,19 @@ def test_missing_report_is_404(auth_client: TestClient) -> None:
     assert response.status_code == 404, response.text
 
 
+def test_detail_counts_reports(  # type: ignore[no-untyped-def]
+    auth_client: TestClient, db_session_factory
+) -> None:
+    """Detail counts expose M9 summaries so the UI can skip doomed /report fetches."""
+    env = setup_inv(auth_client, "rep-count")
+    inv_id = env["inv"]["id"]
+    detail = auth_client.get(f"/api/v1/investigations/{inv_id}").json()["data"]
+    assert detail["counts"]["reports"] == 0
+    seed_reports(db_session_factory, inv_id, ["Only"])
+    detail = auth_client.get(f"/api/v1/investigations/{inv_id}").json()["data"]
+    assert detail["counts"]["reports"] == 1
+
+
 def test_foreign_report_is_hidden(auth_client_factory, db_session_factory) -> None:  # type: ignore[no-untyped-def]
     owner = auth_client_factory("owner-rep@example.com")
     other = auth_client_factory("other-rep@example.com")

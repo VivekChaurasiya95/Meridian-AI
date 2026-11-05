@@ -292,6 +292,8 @@ export interface InvestigationDetail extends Investigation {
     hypotheses: number;
     patches: number;
     verification_runs: number;
+    /** M9 model-written summaries (not M10 file reports). */
+    reports: number;
   };
 }
 
