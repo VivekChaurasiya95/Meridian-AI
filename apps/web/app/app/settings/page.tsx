@@ -8,6 +8,7 @@ import { Check, Moon, Sun } from "lucide-react";
 import { MeridianApiError, getWorkspace, listWorkspaces } from "@/lib/api";
 import type { Workspace } from "@/lib/types";
 import { useAuth } from "@/components/auth/AuthContext";
+import { ProfileCard } from "@/components/settings/ProfileCard";
 import { MembersCard } from "@/components/workspaces/MembersCard";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -41,43 +42,42 @@ function AppearanceCard() {
             <Skeleton className="h-16 flex-1" />
           </div>
         ) : (
-          <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-2 sm:flex-row">
-            {options.map(({ value, label, hint, Icon }) => {
-              const selected = resolvedTheme === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setTheme(value)}
-                  className={cn(
-                    "flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all duration-200",
-                    selected
-                      ? "border-accent bg-surface-2 shadow-card"
-                      : "border-line bg-surface-1 hover:border-line-strong hover:bg-surface-2",
-                  )}
+          <fieldset className="flex flex-col gap-2 sm:flex-row">
+            <legend className="sr-only">Theme</legend>
+            {options.map(({ value, label, hint, Icon }) => (
+              <label
+                key={value}
+                className={cn(
+                  "flex flex-1 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 transition-all duration-200",
+                  "has-checked:border-accent has-checked:bg-surface-2 has-checked:shadow-card",
+                  "has-focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_38%,transparent)]",
+                  "border-line bg-surface-1 hover:border-line-strong hover:bg-surface-2",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="theme"
+                  value={value}
+                  checked={resolvedTheme === value}
+                  onChange={() => setTheme(value)}
+                  className="sr-only"
+                />
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-line bg-surface-1 text-ink-2"
                 >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-line",
-                      selected ? "bg-accent text-accent-ink" : "bg-surface-1 text-ink-2",
-                    )}
-                  >
-                    <Icon className="size-[17px]" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-semibold text-ink">{label}</span>
-                    <span className="block truncate text-[12px] text-ink-3">{hint}</span>
-                  </span>
-                  {selected && (
-                    <Check aria-hidden="true" className="size-4 shrink-0 text-sage" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                  <Icon className="size-[17px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-ink">{label}</span>
+                  <span className="block truncate text-[12px] text-ink-3">{hint}</span>
+                </span>
+                {resolvedTheme === value && (
+                  <Check aria-hidden="true" className="size-4 shrink-0 text-sage" />
+                )}
+              </label>
+            ))}
+          </fieldset>
         )}
         <p className="mt-3 text-[12px] leading-5 text-ink-3">
           You can also switch from the header toggle on any screen.
@@ -179,7 +179,7 @@ export default function SettingsPage() {
             Workspace settings
           </h1>
           <p className="mt-1.5 text-[15px] text-ink-2">
-            Your appearance and this workspace&apos;s membership.
+            Your profile, appearance, and this workspace&apos;s membership.
           </p>
         </div>
         {workspaces && workspaces.length > 0 && (
@@ -215,6 +215,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      <ProfileCard />
 
       <AppearanceCard />
 

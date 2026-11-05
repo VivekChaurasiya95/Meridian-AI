@@ -20,6 +20,41 @@ export interface User {
   status: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  workspace_id: string | null;
+  actor_user_id: string | null;
+  actor_type: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  request_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SnapshotVerification {
+  snapshot_id: string;
+  ok: boolean;
+  tree_digest: string;
+  verified_at: string;
+}
+
+export interface InvestigationReportSection {
+  heading: string;
+  body: string;
+}
+
+export interface InvestigationReport {
+  id: string;
+  investigation_id: string;
+  title: string;
+  summary: string;
+  sections: InvestigationReportSection[];
+  model: string;
+  created_at: string;
+}
+
 export type AssignableRole = "admin" | "developer" | "viewer";
 
 export interface Member {

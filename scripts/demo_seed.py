@@ -34,9 +34,6 @@ sys.path.insert(0, str(ROOT / "services" / "api"))
 
 import os  # noqa: E402
 
-from sqlalchemy import create_engine, delete, select  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-
 from app.models import (  # noqa: E402
     Hypothesis,
     HypothesisEvidence,
@@ -53,6 +50,8 @@ from app.services import ingestion as ingestion_service  # noqa: E402
 from app.services import investigations as investigation_service  # noqa: E402
 from app.services import projects as project_service  # noqa: E402
 from app.services import workspaces as workspace_service  # noqa: E402
+from sqlalchemy import create_engine, delete, select  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 DEMO_SLUG = "demo"
 
@@ -136,9 +135,7 @@ def reset_demo(session) -> bool:  # type: ignore[no-untyped-def]
         print("no demo workspace; nothing to reset")
         return False
     project_ids = list(
-        session.execute(
-            select(Project.id).where(Project.workspace_id == workspace.id)
-        ).scalars()
+        session.execute(select(Project.id).where(Project.workspace_id == workspace.id)).scalars()
     )
     inv_ids = []
     if project_ids:

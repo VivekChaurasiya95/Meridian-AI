@@ -31,6 +31,7 @@ import {
   updateProject,
   uploadProjectArchive,
   validateGitUrl,
+  verifySnapshot,
 } from "@/lib/api";
 import type {
   FilePreview,
@@ -420,6 +421,8 @@ function SnapshotsTab({ project }: { project: Project }) {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<SnapshotDetail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const [verifying, setVerifying] = React.useState(false);
+  const [verifyError, setVerifyError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -449,6 +452,7 @@ function SnapshotsTab({ project }: { project: Project }) {
     }
     setExpandedId(id);
     setDetailLoading(true);
+    setVerifyError(null);
     try {
       setDetail(await getSnapshot(id));
     } catch (err) {
@@ -456,6 +460,30 @@ function SnapshotsTab({ project }: { project: Project }) {
       setError(err instanceof Error ? err.message : "Could not load the snapshot.");
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function onVerify(id: string) {
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      const result = await verifySnapshot(id);
+      setDetail((current) =>
+        current !== null && current.id === id
+          ? { ...current, storage_verified_at: result.verified_at }
+          : current,
+      );
+      setItems((current) =>
+        current.map((snapshot) =>
+          snapshot.id === id
+            ? { ...snapshot, storage_verified_at: result.verified_at }
+            : snapshot,
+        ),
+      );
+    } catch (err) {
+      setVerifyError(err instanceof Error ? err.message : "Could not verify the snapshot.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -544,6 +572,24 @@ function SnapshotsTab({ project }: { project: Project }) {
                       label="Verified"
                       value={detail.storage_verified_at ? formatTimestamp(detail.storage_verified_at) : "—"}
                     />
+                    <div className="flex flex-col gap-2 pt-1">
+                      {verifyError !== null && <p className="text-xs text-danger">{verifyError}</p>}
+                      <div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={verifying || detail.storage_status !== "ready"}
+                          onClick={() => void onVerify(detail.id)}
+                          title={
+                            detail.storage_status !== "ready"
+                              ? "Only ready snapshots can be verified"
+                              : "Re-hash stored blobs and refresh the verified stamp"
+                          }
+                        >
+                          {verifying ? "Verifying…" : "Verify integrity"}
+                        </Button>
+                      </div>
+                    </div>
                     {detail.error_code && (
                       <MetadataRow label="Storage error" value={detail.error_message ?? detail.error_code} />
                     )}

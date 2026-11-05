@@ -3,6 +3,7 @@
 import type {
   ActivityEvent,
   AssignableRole,
+  AuditEvent,
   DownloadUrl,
   ErrorDetail,
   EvidenceArtifact,
@@ -13,6 +14,7 @@ import type {
   HypothesisVerdict,
   Investigation,
   InvestigationDetail,
+  InvestigationReport,
   InvestigationSeverity,
   InvestigationStage,
   InvestigationStatus,
@@ -35,6 +37,7 @@ import type {
   SecurityFindingSeverity,
   SnapshotDetail,
   SnapshotSummary,
+  SnapshotVerification,
   TreeListing,
   UploadResult,
   User,
@@ -222,6 +225,27 @@ export async function getMe(): Promise<User> {
   return data;
 }
 
+export async function updateMe(input: { display_name: string }): Promise<User> {
+  const { data } = await apiFetch<User>("/api/v1/me", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return data;
+}
+
+export async function listAuditEvents(
+  workspaceId: string,
+  options?: { limit?: number; cursor?: string | null; action?: string | null },
+): Promise<{ items: AuditEvent[]; page: PageInfo }> {
+  const params = new URLSearchParams({ limit: String(options?.limit ?? 25) });
+  if (options?.cursor) params.set("cursor", options.cursor);
+  if (options?.action) params.set("action", options.action);
+  const { data, page } = await apiFetch<AuditEvent[]>(
+    `/api/v1/workspaces/${workspaceId}/audit-events?${params}`,
+  );
+  return { items: data, page: page ?? { limit: options?.limit ?? 25, next_cursor: null } };
+}
+
 export async function listMembers(workspaceId: string): Promise<Member[]> {
   const { data } = await apiFetch<Member[]>(`/api/v1/workspaces/${workspaceId}/members`);
   return data;
@@ -402,6 +426,14 @@ export async function getTree(
 export async function getFilePreview(snapshotId: string, path: string): Promise<FilePreview> {
   const params = new URLSearchParams({ path });
   const { data } = await apiFetch<FilePreview>(`/api/v1/snapshots/${snapshotId}/file?${params}`);
+  return data;
+}
+
+export async function verifySnapshot(snapshotId: string): Promise<SnapshotVerification> {
+  const { data } = await apiFetch<SnapshotVerification>(
+    `/api/v1/snapshots/${snapshotId}/verify`,
+    { method: "POST" },
+  );
   return data;
 }
 
@@ -732,6 +764,15 @@ export async function getVerificationComparison(
     `/api/v1/investigations/${investigationId}/verification-comparison`,
   );
   return { investigation_id: investigationId, tests: data };
+}
+
+export async function getLatestInvestigationReport(
+  investigationId: string,
+): Promise<InvestigationReport> {
+  const { data } = await apiFetch<InvestigationReport>(
+    `/api/v1/investigations/${investigationId}/report`,
+  );
+  return data;
 }
 
 export async function listReports(investigationId: string): Promise<Report[]> {
